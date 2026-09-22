@@ -1,0 +1,4 @@
+Kategorie,N,VADER Compound (Mittelwert),Geschätztes Minimum H1,"p (age_c, H1)",Signifikanz age_c H1,"p (age_c_sq, H1)",Signifikanz age_c_sq H1,Geschätztes Minimum H1 im Altersbereich,Geschätztes Minimum H2,"p (age_c, H2)",Signifikanz age_c H2,"p (age_c_sq, H2)",Signifikanz age_c_sq H2,Geschätztes Minimum H2 im Altersbereich,H2 konvergiert
+General,13364,0.738492247829991,49.60825199365361,0.1173862477738606,nein,0.03544614060867745,ja,ja,37.99031980925301,0.009902473465517987,ja,7.864400649427146e-05,ja,ja,True
+General Petite,7837,0.7457485517417379,43.50112646718155,0.9529979832578375,nein,0.027288181924313804,ja,ja,32.98159668304545,0.002592796815341087,ja,0.019765124821779247,ja,ja,True
+Initmates,1426,0.7305488078541374,68.65751913459661,0.37752117942450497,nein,0.7606809115683406,nein,ja,44.30514615447103,0.8779595055569805,nein,0.20146351732195156,nein,ja,True

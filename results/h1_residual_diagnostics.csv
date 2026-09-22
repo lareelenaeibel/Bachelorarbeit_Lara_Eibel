@@ -1,0 +1,17 @@
+Modelltyp,Kennzahl,Wert
+Hauptmodell,Breusch-Pagan Statistik,13.212368566248545
+Hauptmodell,Breusch-Pagan p-Wert,0.15322991142783685
+Hauptmodell,Jarque-Bera Statistik,53263.99395662455
+Hauptmodell,Jarque-Bera p-Wert,0.0
+Hauptmodell,Skewness,-2.4273983279553337
+Hauptmodell,Exzess-Kurtosis,5.738204211094358
+Hauptmodell,F-Statistik,2.887472587464843
+Hauptmodell,F-Test p-Wert,0.0020612682401084225
+Basismodell,Breusch-Pagan Statistik,0.6785329396362982
+Basismodell,Breusch-Pagan p-Wert,0.7122926193136246
+Basismodell,Jarque-Bera Statistik,53398.271924621804
+Basismodell,Jarque-Bera p-Wert,0.0
+Basismodell,Skewness,-2.4297279646059105
+Basismodell,Exzess-Kurtosis,5.743834088969825
+Basismodell,F-Statistik,4.336413752943704
+Basismodell,F-Test p-Wert,0.013094234394390742

@@ -1,0 +1,13 @@
+Modelltyp,Term,Koeffizient,SE,Statistik,p_Wert,df
+OrderedModel: Rating ~ VADER Compound,VADER_Compound,2.400786872759762,0.03722231451391565,64.49859188262519,0.0,
+OrderedModel: Rating ~ VADER Compound,1/2,-2.0284233497057462,0.040171912152381445,-50.49357227536152,0.0,
+OrderedModel: Rating ~ VADER Compound,2/3,0.27670496891430263,0.02510907252710883,11.02011906714436,3.056545030611506e-28,
+OrderedModel: Rating ~ VADER Compound,3/4,0.13453736306509084,0.01818624931832853,7.39775204387531,1.3850917061602516e-13,
+OrderedModel: Rating ~ VADER Compound,4/5,0.1676972322021307,0.013278098812247978,12.629611706718396,1.4499193129264614e-36,
+OrderedModel: Rating ~ VADER Compound,McFadden Pseudo-R2,0.08273673679671012,,,,
+OrderedModel: Rating ~ VADER Compound,AIC,50767.01339969537,,,,
+OrderedModel: Rating ~ VADER Compound,N,22640.0,,,,
+H3: Rating ~ VADER Compound,Brant (Wald) – Omnibus (alle Prädiktoren),123.40934226705812,,,0.0,3.0
+H3: Rating ~ VADER Compound,Brant (Wald) – VADER_Compound,123.40934226705812,,,0.0,3.0
+Korrelation Sentiment/Rating: Pearson (linear),Korrelationskoeffizient,0.47344065746523817,,,0.0,
+Korrelation Sentiment/Rating: Spearman (Rang),Korrelationskoeffizient,0.4324612071957489,,,0.0,

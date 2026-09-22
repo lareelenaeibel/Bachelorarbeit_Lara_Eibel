@@ -1,0 +1,22 @@
+# Backups (nicht für GitHub bestimmt)
+_backup_bootstrap_n300/
+_backup_vor_minimum_umbenennung/
+_backup_vor_sensitivitaetsanalyse_entfernen/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environment
+.venv/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+
+# IDE
+.claude/

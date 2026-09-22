@@ -1,0 +1,36 @@
+                            OLS Regression Results                            
+==============================================================================
+Dep. Variable:         vader_compound   R-squared:                       0.002
+Model:                            OLS   Adj. R-squared:                  0.001
+Method:                 Least Squares   F-statistic:                     3.738
+Date:                Wed, 09 Sep 2026   Prob (F-statistic):           4.91e-05
+Time:                        13:09:02   Log-Likelihood:                -9394.7
+No. Observations:               22627   AIC:                         1.881e+04
+Df Residuals:                   22616   BIC:                         1.890e+04
+Df Model:                          10                                         
+Covariance Type:            nonrobust                                         
+======================================================================================================
+                                         coef    std err          t      P>|t|      [0.025      0.975]
+------------------------------------------------------------------------------------------------------
+Intercept                              0.7466      0.007    112.666      0.000       0.734       0.760
+C(division_name)[T.General Petite]     0.0075      0.005      1.423      0.155      -0.003       0.018
+C(division_name)[T.Initmates]         -0.0002      0.027     -0.007      0.994      -0.053       0.052
+C(department_name)[T.Dresses]         -0.0116      0.008     -1.511      0.131      -0.027       0.003
+C(department_name)[T.Intimate]        -0.0198      0.025     -0.781      0.435      -0.069       0.030
+C(department_name)[T.Jackets]         -0.0095      0.013     -0.726      0.468      -0.035       0.016
+C(department_name)[T.Tops]            -0.0113      0.007     -1.592      0.112      -0.025       0.003
+C(department_name)[T.Trend]           -0.1178      0.034     -3.436      0.001      -0.185      -0.051
+age_c                                 -0.0003      0.000     -1.313      0.189      -0.001       0.000
+age_c_sq                            3.723e-05   1.27e-05      2.937      0.003    1.24e-05    6.21e-05
+positive_feedback_count               -0.0014      0.000     -3.374      0.001      -0.002      -0.001
+==============================================================================
+Omnibus:                    10985.782   Durbin-Watson:                   1.980
+Prob(Omnibus):                  0.000   Jarque-Bera (JB):            53129.632
+Skew:                          -2.425   Prob(JB):                         0.00
+Kurtosis:                       8.731   Cond. No.                     3.81e+03
+==============================================================================
+
+Notes:
+[1] Standard Errors assume that the covariance matrix of the errors is correctly specified.
+[2] The condition number is large, 3.81e+03. This might indicate that there are
+strong multicollinearity or other numerical problems.

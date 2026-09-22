@@ -1,0 +1,64 @@
+Modelltyp,Term,Koeffizient,SE,Statistik,p_Wert
+Basismodell,Intercept,0.7348930565563518,0.0031052150820296224,236.66413988818223,0.0
+Basismodell,age_c,-0.0003002583159837886,0.00021346123111800887,-1.4066175595970176,0.1595545510708633
+Basismodell,age_c_sq,3.706452419252161e-05,1.2664085868456937e-05,2.9267429625410273,0.003428724342011578
+Hauptmodell,Intercept,0.7433903442495304,0.00655789912513141,113.358002321305,0.0
+Hauptmodell,C(division_name)[T.General Petite],0.0075401687936391525,0.005279343809714251,1.4282397709663979,0.15323666537015107
+Hauptmodell,C(division_name)[T.Initmates],0.000623215300411685,0.026732128174005238,0.023313344016422523,0.9814005332887001
+Hauptmodell,C(department_name)[T.Dresses],-0.013039114855022313,0.007671197667157372,-1.699749559426236,0.08919179328755883
+Hauptmodell,C(department_name)[T.Intimate],-0.02024333758047297,0.02532829395662036,-0.7992381016717363,0.424160755921582
+Hauptmodell,C(department_name)[T.Jackets],-0.010508117221128987,0.013080893454799092,-0.803318004036933,0.4217993964337897
+Hauptmodell,C(department_name)[T.Tops],-0.011725965471421074,0.007083216549909733,-1.6554577131445327,0.09784556117369507
+Hauptmodell,C(department_name)[T.Trend],-0.11953411257633789,0.034303381621908935,-3.4846160035718947,0.000493776640285445
+Hauptmodell,age_c,-0.00031508269589023026,0.00021423234365105614,-1.470752224059315,0.14137204888536353
+Hauptmodell,age_c_sq,3.8033133596820435e-05,1.2677339582809847e-05,3.000087940248316,0.0027019562887456087
+Robustheitsmodell A (+ Recommended IND),Intercept,0.39242936786506805,0.0076053373104741145,51.59920616862214,0.0
+Robustheitsmodell A (+ Recommended IND),C(division_name)[T.General Petite],0.00355852390039488,0.004748577716990305,0.7493873139450915,0.45363158938721465
+Robustheitsmodell A (+ Recommended IND),C(division_name)[T.Initmates],-0.007942046960805242,0.02404328046130401,-0.33032293465891294,0.7411590249858379
+Robustheitsmodell A (+ Recommended IND),C(department_name)[T.Dresses],0.005433595383269775,0.0069041359193142415,0.7870058537042055,0.43128668635517936
+Robustheitsmodell A (+ Recommended IND),C(department_name)[T.Intimate],-0.012727365232729836,0.02278061223731711,-0.5586928525073191,0.5763768895274846
+Robustheitsmodell A (+ Recommended IND),C(department_name)[T.Jackets],-0.002808341003933467,0.011765485273664828,-0.23869317232664367,0.8113456741349301
+Robustheitsmodell A (+ Recommended IND),C(department_name)[T.Tops],0.005101530495652059,0.006374834406244074,0.8002608649183375,0.4235680780555368
+Robustheitsmodell A (+ Recommended IND),C(department_name)[T.Trend],-0.07640350735273835,0.030858255600118307,-2.4759503046065063,0.013295471282139749
+Robustheitsmodell A (+ Recommended IND),age_c,-0.0006895170496956462,0.0001927495996000634,-3.5772683892798054,0.0003479285485259683
+Robustheitsmodell A (+ Recommended IND),age_c_sq,2.4890575976454066e-05,1.1403473063392218e-05,2.1827188820534476,0.029066767471066728
+Robustheitsmodell A (+ Recommended IND),recommended_ind,0.41681978945083153,0.005702261089931579,73.09728244236409,0.0
+Robustheitsmodell B (+ Positive Feedback Count),Intercept,0.7466468222690819,0.00662705641112106,112.66643528431592,0.0
+Robustheitsmodell B (+ Positive Feedback Count),C(division_name)[T.General Petite],0.007512312461934666,0.0052781387929500805,1.423288162101522,0.15466643154191698
+Robustheitsmodell B (+ Positive Feedback Count),C(division_name)[T.Initmates],-0.0001925449003332691,0.026727087469326144,-0.007204110831539237,0.9942520644536077
+Robustheitsmodell B (+ Positive Feedback Count),C(department_name)[T.Dresses],-0.011604101935888712,0.0076812216370577314,-1.5107104682288048,0.1308762052002033
+Robustheitsmodell B (+ Positive Feedback Count),C(department_name)[T.Intimate],-0.019778338735730445,0.025322856807528948,-0.7810468971198378,0.4347830879632686
+Robustheitsmodell B (+ Positive Feedback Count),C(department_name)[T.Jackets],-0.009497903566719593,0.013081318783346363,-0.7260662112149759,0.4678056952250164
+Robustheitsmodell B (+ Positive Feedback Count),C(department_name)[T.Tops],-0.011272595081004314,0.007082865886209226,-1.5915302170203094,0.11150427685138259
+Robustheitsmodell B (+ Positive Feedback Count),C(department_name)[T.Trend],-0.11784311090261954,0.034299171865943306,-3.435742162032476,0.0005919943059357049
+Robustheitsmodell B (+ Positive Feedback Count),age_c,-0.00028161136136940643,0.00021441280700406148,-1.3134073719956105,0.18905903901544355
+Robustheitsmodell B (+ Positive Feedback Count),age_c_sq,3.72304451913021e-05,1.2676663089207977e-05,2.9369278752069614,0.0033181529252406445
+Robustheitsmodell B (+ Positive Feedback Count),positive_feedback_count,-0.0014256164301641129,0.0004225348469974351,-3.3739617934346766,0.0007421903195784838
+Basismodell,Geschätztes Minimum (Age),47.33113489846089,,,
+Basismodell,R2,0.0003829794580160195,,,
+Basismodell,Adj. R2,0.0002946623647137603,,,
+Basismodell,AIC,18826.48783360127,,,
+Basismodell,N,22640.0,,,
+Basismodell,Condition Number (roh),25703.825235483568,,,
+Basismodell,Condition Number (zentriert),328.06515415836327,,,
+Hauptmodell,Geschätztes Minimum (Age),47.42286690822285,,,
+Hauptmodell,R2,0.0011476954430299502,,,
+Hauptmodell,Adj. R2,0.0007502213863022078,,,
+Hauptmodell,AIC,18820.860404516396,,,
+Hauptmodell,N,22627.0,,,
+Hauptmodell,Condition Number (roh),34517.569759295344,,,
+Hauptmodell,Condition Number (zentriert),3805.412895809652,,,
+Robustheitsmodell A (+ Recommended IND),Geschätztes Minimum (Age),57.13161984192534,,,
+Robustheitsmodell A (+ Recommended IND),R2,0.19203577146899464,,,
+Robustheitsmodell A (+ Recommended IND),Adj. R2,0.1916785180959264,,,
+Robustheitsmodell A (+ Recommended IND),AIC,14023.919467421081,,,
+Robustheitsmodell A (+ Recommended IND),N,22627.0,,,
+Robustheitsmodell A (+ Recommended IND),Condition Number (roh),34521.941747392375,,,
+Robustheitsmodell A (+ Recommended IND),Condition Number (zentriert),3805.706567318508,,,
+Robustheitsmodell B (+ Positive Feedback Count),Geschätztes Minimum (Age),47.06265738925785,,,
+Robustheitsmodell B (+ Positive Feedback Count),R2,0.001650208391442809,,,
+Robustheitsmodell B (+ Positive Feedback Count),Adj. R2,0.0012087732165185772,,,
+Robustheitsmodell B (+ Positive Feedback Count),AIC,18811.47411492106,,,
+Robustheitsmodell B (+ Positive Feedback Count),N,22627.0,,,
+Robustheitsmodell B (+ Positive Feedback Count),Condition Number (roh),34519.629761963435,,,
+Robustheitsmodell B (+ Positive Feedback Count),Condition Number (zentriert),3805.6851197560177,,,
