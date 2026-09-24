@@ -1,0 +1,280 @@
+# 05: Ergebnisse: Konsolidierte Zusammenfassung
+
+## Einleitung
+
+Dieses Notebook führt die zentralen Ergebnisse aus `04_Regression.ipynb` (H1, H2, H3 sowie die kategorienbasierte Robustheitsprüfung) und `05_Amazon_Robustness.ipynb` (externe Robustheitsprüfung anhand einer Amazon Electronics Stichprobe) zusammen. Hierzu werden ausschliesslich bereits vorliegende Ergebnisse aus den Ordnern `results/` und `figures/` eingelesen, tabellarisch beziehungsweise grafisch aufbereitet und knapp interpretiert. In diesem Notebook werden keine neuen Modellschätzungen oder inhaltlichen Neuberechnungen durchgeführt. Sämtliche dargestellten Ergebnisse und Grafiken wurden bereits in den beiden genannten Notebooks erzeugt und gespeichert.
+
+
+Zunächst werden die benötigten Bibliotheken importiert, die Pfade zu den Ordnern `results` und `figures` definiert sowie zwei Hilfsfunktionen zum Einlesen und Anzeigen bestehender Text und CSV Dateien bereitgestellt.
+
+
+
+```python
+import pandas as pd
+from pathlib import Path
+from IPython.display import display, Markdown
+
+pd.set_option("display.max_columns", None)
+pd.set_option("display.width", 160)
+pd.set_option("display.max_colwidth", 80)
+
+PROJECT_ROOT = Path.cwd().parent
+RESULTS_DIR = PROJECT_ROOT / "results"
+FIGURES_DIR = PROJECT_ROOT / "figures"
+
+
+def show_txt(filename):
+    """Liest eine bestehende .txt-Ergebnisdatei ein und gibt sie unverändert aus."""
+    path = RESULTS_DIR / filename
+    print(f"--- {filename} " + "-" * max(0, 60 - len(filename)))
+    print(path.read_text())
+
+
+def load_csv(filename, **kwargs):
+    """Liest eine bestehende .csv-Ergebnisdatei ein (kein Neuberechnen, nur Einlesen)."""
+    return pd.read_csv(RESULTS_DIR / filename, **kwargs)
+
+```
+
+## H1: Sentiment ~ Alter
+
+H1 prüft mittels OLS Regression, ob zwischen `Age` und dem Sentiment Mass `VADER Compound` ein nicht linearer Zusammenhang besteht. Verglichen werden ein Basismodell mit Alter als einzigem Prädiktor, ein Hauptmodell mit zusätzlichen Kontrollvariablen (`Division Name`, `Department Name`) sowie zwei Robustheitsmodelle mit zusätzlich `Recommended IND` beziehungsweise `Positive Feedback Count`.
+
+**Einordnung `h1_regression_updated.csv` versus `h1_regression_fit_stats.csv`:** Die beiden Dateien enthalten unterschiedliche, einander ergänzende Tabellenformate. `h1_regression_updated.csv` ist eine Koeffiziententabelle im Langformat mit den Spalten `Modelltyp`, `Term`, `Koeffizient`, `SE`, `Statistik` und `p_Wert`. Sie enthält die Einzelkoeffizienten aller vier Modelle sowie einen zusätzlichen Kennzahlenblock je Modell mit geschätztem Minimum, R², adjustiertem R², AIC, N und Condition Number. `h1_regression_fit_stats.csv` ist dagegen eine kompakte Übersichtstabelle, die ausschliesslich die globalen Gütemasse N, R², adjustiertes R², AIC und BIC der vier Modelle gegenüberstellt. Im Folgenden wird `h1_regression_fit_stats.csv` für den direkten Vergleich der Modellgüte verwendet, während `h1_regression_updated.csv` ergänzend zur Betrachtung der einzelnen Koeffizienten dient.
+
+
+
+```python
+h1_fit_stats = load_csv("h1_regression_fit_stats.csv", index_col=0)
+display(h1_fit_stats)
+
+```
+
+Die Gütemasse zeigen, dass Basismodell, Hauptmodell und Robustheitsmodell B praktisch keine Varianz erklären (R² jeweils unter 0,002), während Robustheitsmodell A mit R² = 0,192 deutlich heraussticht. Der starke Anstieg der erklärten Varianz geht mit der zusätzlichen Aufnahme von `Recommended IND` einher. Die Variable bildet eine inhaltlich eng mit dem Sentiment verbundene Empfehlung ab und kann als Konsequenz der zugrunde liegenden Bewertung betrachtet werden. Sie wird daher als potenzielle Post Treatment Variable eingestuft und bewusst nicht in das Hauptmodell aufgenommen. Auch AIC und BIC zeigen ein deutlich abweichendes Bild für Robustheitsmodell A, während die übrigen drei Modelle vergleichsweise nahe beieinander liegen.
+
+Zur vollständigen Dokumentation folgen nachfolgend die vier statsmodels-Regressionsausgaben im Original.
+
+
+
+```python
+for fname in [
+    "h1_regression_basismodell.txt",
+    "h1_regression_hauptmodell.txt",
+    "h1_regression_robustheitsmodell_a.txt",
+    "h1_regression_robustheitsmodell_b.txt",
+]:
+    show_txt(fname)
+    print()
+
+```
+
+In allen vier Modellen ist der quadratische Term `age_c_sq` statistisch signifikant (p ≤ 0,029), während der lineare Term `age_c` nur in Robustheitsmodell A signifikant ist. Der positive quadratische Term und die innerhalb des beobachteten Altersbereichs liegenden geschätzten Minima sprechen für eine schwache, aber über die Modellspezifikationen hinweg konsistente U förmige Krümmung des Zusammenhangs zwischen Alter und `VADER Compound`. Deren praktische Bedeutung bleibt angesichts der insgesamt sehr geringen erklärten Varianz jedoch begrenzt. Unter den Kontrollvariablen ist ausschliesslich `Department Name = Trend` im Hauptmodell und in Robustheitsmodell B signifikant negativ mit `VADER Compound` assoziiert.
+
+Ergänzend enthält `h1_regression_updated.csv` dieselben Koeffizienten im Langformat einschliesslich Standardfehlern, Teststatistiken und p Werten für die einzelnen Modellterme sowie den bereits beschriebenen Kennzahlenblock.
+
+
+```python
+h1_updated = load_csv("h1_regression_updated.csv")
+display(h1_updated)
+
+```
+
+Als kompakte Gegenüberstellung derselben Informationen liegt zusätzlich die Datei `h1_regression_vergleich.txt` vor.
+
+
+```python
+show_txt("h1_regression_vergleich.txt")
+
+```
+
+Die Vergleichstabelle bestätigt nochmals kompakt, dass Robustheitsmodell A als einziges Modell deutlich von den übrigen drei Modellen abweicht. Dies zeigt sich sowohl in der Erklärungskraft als auch beim Vorzeichen und bei der statistischen Signifikanz des linearen Altersterms `age_c`. Basismodell, Hauptmodell und Robustheitsmodell B zeigen dagegen ein weitgehend konsistentes Bild.
+
+Die Residualdiagnostik untersucht für das Basis und Hauptmodell insbesondere die Homoskedastizität und die Normalverteilung der Residuen. Ergänzend wird mittels F Test die statistische Gesamtsignifikanz der Modelle geprüft.
+
+
+```python
+h1_resid = load_csv("h1_residual_diagnostics.csv")
+display(h1_resid.pivot(index="Kennzahl", columns="Modelltyp", values="Wert"))
+
+```
+
+Der Breusch Pagan Test zeigt für beide Modelle keine statistisch signifikanten Hinweise auf Heteroskedastizität (p = 0,153 im Hauptmodell; p = 0,712 im Basismodell). Der Jarque Bera Test ist dagegen in beiden Modellen hochsignifikant, bei einer Skewness von rund minus 2,4 und einer deutlich erhöhten Exzess Kurtosis. Dieses Muster ist mit der Begrenzung von `VADER Compound` auf das Intervall von minus 1 bis 1 sowie der starken Konzentration der Werte am positiven Rand vereinbar und wird als Limitation berücksichtigt. Die Nichtnormalität der Residuen allein führt jedoch nicht zu verzerrten OLS Punktschätzern. Der F Test weist für beide Modelle auf eine statistische Gesamtsignifikanz hin, deren praktische Bedeutung angesichts der sehr geringen R² Werte jedoch gering bleibt.
+
+Die zugehörigen Diagnostikgrafiken veranschaulichen dieses Bild.
+
+![Residuen vs. Fitted Values (H1)](../figures/h1_residuals_vs_fitted.png)
+
+![Q-Q-Plot der Residuen, Hauptmodell (H1)](../figures/h1_qqplot_hauptmodell.png)
+
+
+Der Residuen versus Fitted Plot zeigt keine erkennbare systematische Bogenform, sondern ausgeprägte senkrechte Punktbänder, die mit der diskreten Struktur der Modellprädiktoren und insbesondere den kategorialen Kontrollvariablen vereinbar sind. Ein deutlicher Hinweis auf eine zusätzliche systematische Fehlanpassung der funktionalen Form ist daraus nicht erkennbar. Der Q Q Plot bestätigt die bereits im Jarque Bera Test festgestellte Abweichung von der Normalverteilung. Insbesondere an den Rändern weichen die Punkte deutlich von der Referenzgeraden ab, was mit der ausgeprägten Linksschiefe und erhöhten Exzess Kurtosis der Residuen vereinbar ist.
+
+## H2: Rating ~ Alter
+
+H2 prüft mittels ordinaler logistischer Regression (`OrderedModel`) unter Anwendung des Proportional Odds Ansatzes, ob zwischen `Age` und der Sternebewertung `Rating` ein nicht linearer Zusammenhang besteht. Ergänzend wird geprüft, ob die zugrunde liegende Proportional Odds Annahme erfüllt ist.
+
+
+```python
+h2_fit_stats = load_csv("h2_ordinal_fit_stats.csv", index_col=0)
+display(h2_fit_stats)
+
+```
+
+Wie bei H1 fällt Robustheitsmodell A mit `Recommended IND` deutlich aus dem Rahmen. Das McFadden Pseudo R² steigt von rund 0,003 im Hauptmodell auf 0,271, begleitet von einem deutlich niedrigeren AIC. `Recommended IND` bildet eine inhaltlich eng mit `Rating` verbundene Empfehlungsentscheidung ab und kann als potenziell nachgelagerte Variable betrachtet werden. Der starke Anstieg der Modellgüte wird daher nicht als eigenständiger inhaltlicher Befund interpretiert, sondern unterstützt die Entscheidung, `Recommended IND` nicht in das Hauptmodell aufzunehmen und lediglich im Rahmen der Robustheitsanalyse zu berücksichtigen. Basismodell, Hauptmodell und Robustheitsmodell B liegen mit McFadden Pseudo R² Werten zwischen 0,001 und 0,004 dagegen nahe beieinander.
+
+
+```python
+h2_updated = load_csv("h2_ordinal_regression_updated.csv")
+display(h2_updated)
+
+```
+
+Über die vier Modelle hinweg sind `Age_c` und `Age_c_sq` statistisch signifikant (p < 0,001), mit Ausnahme von `Age_c` in Robustheitsmodell A. Bei zusätzlicher Aufnahme von `Recommended IND` ist der lineare Altersterm nicht mehr statistisch signifikant (p = 0,903). Die Schätzung und Signifikanz des linearen Altersterms hängen damit deutlich von der Berücksichtigung von `Recommended IND` ab, was den bereits bei den Gütemassen erkennbaren Sonderstatus dieses Modells unterstreicht. Von den Kontrollvariablen im Hauptmodell sind `Department_Dresses`, `Department_Tops` und `Department_Trend` signifikant negativ mit `Rating` assoziiert.
+
+
+```python
+h2_brant = load_csv("h2_proportional_odds_tests.csv")
+display(h2_brant)
+
+```
+
+Sowohl der Brant Test als auch der Likelihood Ratio Cross Check zeigen für das Basis und Hauptmodell eine statistisch signifikante Verletzung der Proportional Odds Annahme für den gemeinsamen Altersblock aus `Age_c` und `Age_c_sq` (jeweils p < 0,01). Der Zusammenhang zwischen Alter und `Rating` ist somit nicht über alle Schwellenwerte der Rating Kategorien hinweg konstant. Im Hauptmodell zeigt zusätzlich `Department_Jackets` eine signifikante Verletzung der Proportional Odds Annahme (p = 0,014), obwohl der im `OrderedModel` geschätzte gemeinsame Koeffizient dieser Kategorie selbst nicht statistisch signifikant ist. Dies stellt keinen Widerspruch dar, da der Test auf Verletzung der Proportional Odds Annahme Unterschiede des Koeffizienten zwischen den einzelnen Schwellenwerten erfasst, während das `OrderedModel` einen gemeinsamen Koeffizienten über diese Schwellenwerte hinweg schätzt.
+
+
+```python
+h2_jackets = load_csv("h2_department_jackets_thresholds.csv")
+display(h2_jackets)
+
+```
+
+Die schwellenspezifische Zerlegung für `Department: Jackets` klärt diesen scheinbaren Widerspruch auf. An den unteren Schwellen (`Rating > 1`, `Rating > 2`) sind die Koeffizienten signifikant negativ, während sie an den oberen Schwellen (`Rating > 3`, `Rating > 4`) nahe bei null liegen und nicht statistisch signifikant sind. Im Vergleich zur Referenzkategorie `Bottoms` weisen Reviews der Kategorie `Jackets` somit eine geringere geschätzte Wahrscheinlichkeit auf, die unteren Rating Schwellen zu überschreiten. An den oberen Schwellen lässt sich dagegen kein statistisch signifikanter Unterschied zur Referenzkategorie feststellen. Diese Unterschiede zwischen den Schwellenwerten erklären, weshalb die Proportional Odds Annahme für `Department_Jackets` verletzt ist, obwohl der im Hauptmodell geschätzte gemeinsame Koeffizient nicht statistisch signifikant ist.
+
+Für H2 liegt im Ordner `figures/` keine eigenständige Grafik vor, die ausschliesslich diesem Abschnitt zugeordnet ist. Die kategorienbezogenen Abbildungen sowie die Grafiken zu den geschätzten Minima, die auch H2 einbeziehen, werden in den entsprechenden späteren Abschnitten dargestellt.
+
+## H3: Sentiment ~ Rating
+
+H3 untersucht den Zusammenhang zwischen Freitext Sentiment (`VADER Compound`) und Sternebewertung (`Rating`). Dabei wird `VADER Compound` als Prädiktor für `Rating` spezifiziert. Die Analyse erfolgt mittels ordinaler logistischer Regression sowie ergänzend anhand der Pearson und Spearman Korrelation.
+
+
+```python
+h3 = load_csv("h3_sentiment_rating.csv")
+display(h3)
+
+```
+
+`VADER Compound` ist im `OrderedModel` hochsignifikant positiv mit `Rating` assoziiert (Koeffizient = 2,401; p < 0,001). Mit einem McFadden Pseudo R² von 0,083 weist das Modell eine deutlich höhere Modellgüte auf als die reinen Altersmodelle aus H2. Wie in H2 ist die Proportional Odds Annahme jedoch deutlich verletzt (Brant Omnibus Chi Quadrat = 123,4; p < 0,001), sodass die Interpretation des gemeinsamen Koeffizienten über alle Rating Schwellen hinweg mit entsprechender Vorsicht erfolgen muss. Die Pearson Korrelation (r = 0,473) und die Spearman Korrelation (ρ = 0,432) liegen relativ nahe beieinander und weisen auf einen moderaten positiven, aber keineswegs perfekten Zusammenhang zwischen Freitext Sentiment und Sternebewertung hin.
+
+Die folgenden Grafiken veranschaulichen zunächst die Randverteilungen und anschliessend den bivariaten Zusammenhang.
+
+![Verteilung Rating und VADER Compound](../figures/h3_rating_vs_compound_distribution.png)
+
+![Mittlerer VADER Compound Score je Rating](../figures/vader_compound_by_rating.png)
+
+
+Die Randverteilungen zeigen die bereits mehrfach festgestellte Linksschiefe von `Rating` und `VADER Compound`. Beide Masse konzentrieren sich stark am oberen beziehungsweise positiven Ende ihrer jeweiligen Skala. Gleichzeitig steigt der mittlere `VADER Compound` Wert über alle fünf Rating Stufen hinweg streng monoton an, was den moderaten und konsistent positiven Zusammenhang zwischen Freitext Sentiment und Sternebewertung deskriptiv veranschaulicht.
+
+## Vergleich der geschätzten Minima H1 vs. H2
+
+Die aus H1 und H2 resultierenden geschätzten Minima der U förmigen Alterskurven wurden bislang lediglich anhand ihrer Punktschätzer gegenübergestellt. Ergänzend wird die Differenz zwischen den geschätzten Minima nun mittels eines gepaarten Bootstrap Verfahrens untersucht und ihre statistische Unsicherheit anhand von Bootstrap Konfidenzintervallen quantifiziert.
+
+
+```python
+turning_point = load_csv("h1_h2_turning_point_bootstrap.csv")
+display(turning_point.T)
+
+```
+
+Das geschätzte Minimum liegt im H1 Hauptmodell bei rund 47,4 Jahren und im H2 Hauptmodell bei rund 37,2 Jahren, was einer Differenz von rund 10,2 Jahren entspricht. Sowohl das Perzentil Konfidenzintervall als auch das BCa Konfidenzintervall, basierend auf 1'000 erfolgreichen Bootstrap Resamples, schliessen null vollständig aus. In keinem der 1'000 Bootstrap Resamples zeigte sich eine Differenz mit entgegengesetztem Vorzeichen, weshalb der zweiseitige anteilsbasierte Bootstrap p Wert numerisch 0,0 beträgt. Die geschätzten Minima des Alterseffekts auf Sentiment (H1) und Rating (H2) unterscheiden sich damit statistisch signifikant. Die Ergebnisse sprechen somit gegen eine Erklärung der beobachteten Differenz allein durch Stichprobenvariabilität.
+
+![Bootstrap-Verteilung der geschätzten Minimum-Differenz H1 vs. H2](../figures/h1_h2_turning_point_bootstrap.png)
+
+
+Die Bootstrap-Verteilung ist sichtbar rechtsschief, weshalb ergänzend zum symmetrischen Perzentilintervall auch das verzerrungskorrigierte und beschleunigte (BCa) Intervall herangezogen wird; beide Intervalle schliessen die Nulllinie jedoch übereinstimmend aus.
+
+
+## Robustheit nach Produktkategorie
+
+Dieser Abschnitt untersucht, ob der in H1 und H2 geschätzte Alterseffekt über die Produktkategorien `Division Name`, `Department Name` und `Class Name` hinweg konsistent auftritt oder sich auf einzelne Kategorien beschränkt.
+
+
+```python
+kat_division = load_csv("h1_h2_kategorien_robustheit_division.csv")
+display(kat_division)
+
+```
+
+![Geschätztes Minimum nach Division Name (H1 vs. H2)](../figures/h1_h2_kategorien_division.png)
+
+
+Auf Divisionsebene liegen die geschätzten Minima für `General` und `General Petite` in beiden Hypothesen nahe an den Referenzwerten des Basismodells für den Gesamtdatensatz. Für die kleinste Division `Initmates` (N = 1'426) sind dagegen weder `age_c` noch `age_c_sq` in einem der beiden Modelle statistisch signifikant, sodass das dort abweichende geschätzte Minimum statistisch nicht abgesichert ist und entsprechend vorsichtig interpretiert werden sollte.
+
+
+```python
+kat_department = load_csv("h1_h2_kategorien_robustheit_department.csv")
+display(kat_department)
+
+```
+
+![Geschätztes Minimum nach Department Name (H1 vs. H2)](../figures/h1_h2_kategorien_department.png)
+
+
+Auf Department Ebene ist nur die grösste Kategorie `Tops` (N = 10'048) bei H1 im quadratischen und bei H2 im linearen Altersterm statistisch signifikant. `Trend` (N = 118) wird aufgrund der geringen Fallzahl lediglich deskriptiv ausgewiesen und fällt bereits durch einen niedrigeren mittleren `VADER Compound` Wert auf (0,63 gegenüber 0,73 bis 0,75 in den übrigen Departments). In den verbleibenden Departments (`Dresses`, `Bottoms`, `Intimate`, `Jackets`) ist keiner der beiden Altersterme statistisch signifikant, sodass die dort geschätzten Minima nur eingeschränkt interpretierbar sind.
+
+
+```python
+kat_class = load_csv("h1_h2_kategorien_robustheit_class.csv")
+display(kat_class)
+
+```
+
+![Geschätztes Minimum nach Class Name (H1 vs. H2)](../figures/h1_h2_kategorien_class.png)
+
+
+Auf Class Ebene ergeben sich für `Blouses` bei H1 und `Jeans` bei H2 rechnerisch geschätzte Minima weit ausserhalb des beobachteten Altersbereichs von 18 bis 99 Jahren. In beiden Fällen ist der Koeffizient von `age_c_sq` statistisch nicht von null zu unterscheiden, sodass die daraus berechneten extremen Minima nicht belastbar und inhaltlich nicht sinnvoll interpretierbar sind. Insgesamt ist der Alterseffekt in den meisten Einzelkategorien statistisch nicht nachweisbar. Dies ist mit dem bereits im Gesamtmodell schwach ausgeprägten Alterseffekt vereinbar. Die Ergebnisse auf Kategorieebene sollten daher nicht als Beleg für einen durchgängig stabilen Alterseffekt über alle Produktkategorien hinweg interpretiert werden.
+
+## Externe Robustheit (Amazon Electronics)
+
+Dieser Abschnitt untersucht die Übertragbarkeit der Ergebnisse aus H3 anhand einer unabhängigen Stichprobe von 24'992 Amazon Electronics Reviews aus einer anderen Produktkategorie und Plattformdomäne.
+
+
+```python
+amazon = load_csv("robustness_amazon_electronics.csv")
+display(amazon)
+
+```
+
+Der Zusammenhang zwischen Sentiment und Rating zeigt sich in der unabhängigen Stichprobe in vergleichbarer Richtung und Grössenordnung. Die Pearson Korrelation beträgt 0,492 in der Amazon Stichprobe gegenüber 0,473 im Hauptdatensatz. Der `OrderedModel` Koeffizient von `VADER Compound` liegt bei 1,960 gegenüber 2,401 und weist ebenfalls dasselbe positive Vorzeichen auf. Deutlich stärker ausgeprägt ist in der Amazon Stichprobe hingegen die Verletzung der Proportional Odds Annahme. Der Brant Omnibus Chi Quadrat Wert beträgt 634,4 gegenüber 123,4 im Hauptdatensatz. Gleichzeitig weist die Rating Verteilung der Amazon Stichprobe eine stärker ausgeprägte J Shape Form mit vergleichsweise schwach besetzten mittleren Rating Kategorien auf. Diese unterschiedliche Verteilungsstruktur könnte dazu beitragen, dass der Zusammenhang zwischen Sentiment und Rating stärker zwischen den einzelnen Rating Schwellen variiert. Ein unmittelbarer kausaler Zusammenhang zwischen der Verteilungsform und der stärkeren Verletzung der Proportional Odds Annahme lässt sich daraus jedoch nicht ableiten.
+
+![Rating-Verteilung im Vergleich: Hauptdatensatz vs. Amazon Electronics](../figures/robustness_rating_distribution_comparison.png)
+
+
+Der direkte Verteilungsvergleich verdeutlicht diesen Unterschied zusätzlich. Der Anteil der 5 Sterne Bewertungen liegt in der Amazon Stichprobe bei rund 66 Prozent gegenüber 55 Prozent im Hauptdatensatz, während der Anteil der 1 Sterne Bewertungen rund 8 Prozent gegenüber 4 Prozent beträgt. Die Extremkategorien sind in der Amazon Stichprobe damit stärker besetzt. Trotz dieser Unterschiede in der Rating Verteilung zeigt sich in beiden Stichproben ein positiver Zusammenhang zwischen Sentiment und Rating in vergleichbarer Grössenordnung.
+
+## Gesamtfazit
+
+Über die drei Hypothesen hinweg ergibt sich ein differenziertes Gesamtbild. Sowohl für den Zusammenhang zwischen Alter und Sentiment (H1) als auch zwischen Alter und Rating (H2) zeigen die Modelle Evidenz für einen nichtlinearen, U förmigen Verlauf. Bei H1 ist die erklärte Varianz jedoch äusserst gering, sodass die praktische Bedeutung des Alterseffekts trotz des signifikanten quadratischen Altersterms begrenzt ist. Bei H2 zeigt sich der nichtlineare Alterseffekt deutlicher und bleibt in den Modellen ohne `Recommended IND` weitgehend stabil. Potenzielle Post Treatment Variablen wie `Recommended IND` und `Positive Feedback Count` wurden bewusst aus den Hauptmodellen ausgeschlossen und lediglich in separaten Robustheitsmodellen berücksichtigt.
+
+Die geschätzten Minima der Alterskurven unterscheiden sich zwischen H1 mit rund 47 Jahren und H2 mit rund 37 Jahren statistisch signifikant, wie der gepaarte Bootstrap Vergleich zeigt. Auf Ebene einzelner Produktkategorien sind die Altersterme dagegen in den meisten Fällen statistisch nicht signifikant. Dies kann sowohl mit geringeren Fallzahlen als auch mit sehr kleinen Effekten innerhalb einzelner Kategorien zusammenhängen. Die Ergebnisse liefern daher keine Evidenz dafür, dass der im Gesamtdatensatz beobachtete Alterseffekt konsistent über sämtliche Produktkategorien hinweg auftritt.
+
+Der Zusammenhang zwischen Sentiment und Rating (H3) fällt demgegenüber deutlich stärker aus. Die positive Beziehung zwischen `VADER Compound` und `Rating` zeigt sich sowohl in der ordinalen Regression als auch anhand der Pearson und Spearman Korrelation. Darüber hinaus konnte der Zusammenhang in einer unabhängigen Amazon Electronics Stichprobe mit vergleichbarer Richtung und Grössenordnung repliziert werden. Dies liefert zusätzliche Evidenz für die Übertragbarkeit des grundlegenden positiven Zusammenhangs zwischen Freitext Sentiment und Sternebewertung über die untersuchte Produktkategorie und Plattform hinaus.
+
+Methodische Einschränkungen sind bei der Interpretation aller drei Hypothesen zu berücksichtigen. Bei H1 zeigen die Residuen eine deutliche Abweichung von der Normalverteilung, während im finalen Hauptmodell nach dem vorab definierten Breusch Pagan Kriterium keine statistisch signifikante Heteroskedastizität festgestellt wurde. Bei H2 und H3 wird die Proportional Odds Annahme verletzt, sodass die Annahme eines über alle Rating Schwellen konstanten Effekts nicht aufrechterhalten werden kann. Die entsprechenden Koeffizienten des `OrderedModel` sind daher als unter dieser Restriktion geschätzte gemeinsame Zusammenhänge vorsichtig zu interpretieren. Insgesamt bleiben die zentralen Richtungsmuster der Ergebnisse bestehen, ihre Stärke und insbesondere ihre modellabhängige Interpretation sollten jedoch unter Berücksichtigung dieser Einschränkungen beurteilt werden.
+
+
+## Übersicht: Abschnitte, eingelesene Dateien und eingebundene Grafiken
+
+Zur Dokumentation zeigt die folgende Übersicht, welche Abschnitte in diesem Notebook enthalten sind, welche Dateien aus results/ jeweils eingelesen und welche PNG Dateien aus figures/ den einzelnen Abschnitten zugeordnet wurden.
+
+| Abschnitt | Eingelesene Dateien (`results/`) | Eingebundene Grafiken (`figures/`) |
+|---|---|---|
+| Einleitung | – (keine Datei, nur Setup-Zelle) | – |
+| H1: Sentiment ~ Alter | `h1_regression_basismodell.txt`, `h1_regression_hauptmodell.txt`, `h1_regression_robustheitsmodell_a.txt`, `h1_regression_robustheitsmodell_b.txt`, `h1_regression_fit_stats.csv`, `h1_regression_updated.csv`, `h1_regression_vergleich.txt`, `h1_residual_diagnostics.csv` | `h1_residuals_vs_fitted.png`, `h1_qqplot_hauptmodell.png` |
+| H2: Rating ~ Alter | `h2_ordinal_fit_stats.csv`, `h2_ordinal_regression_updated.csv`, `h2_proportional_odds_tests.csv`, `h2_department_jackets_thresholds.csv` | keine (kein eigenständiges H2-spezifisches PNG vorhanden) |
+| H3: Sentiment ~ Rating | `h3_sentiment_rating.csv` | `h3_rating_vs_compound_distribution.png`, `vader_compound_by_rating.png` |
+| Vergleich der geschätzten Minima H1 vs. H2 | `h1_h2_turning_point_bootstrap.csv` | `h1_h2_turning_point_bootstrap.png` |
+| Robustheit nach Produktkategorie | `h1_h2_kategorien_robustheit_division.csv`, `h1_h2_kategorien_robustheit_department.csv`, `h1_h2_kategorien_robustheit_class.csv` | `h1_h2_kategorien_division.png`, `h1_h2_kategorien_department.png`, `h1_h2_kategorien_class.png` |
+| Externe Robustheit (Amazon Electronics) | `robustness_amazon_electronics.csv` | `robustness_rating_distribution_comparison.png` |
+| Gesamtfazit | – (keine neue Datei, nur zusammenfassender Text) | – |
+
+**Hinweis zu nicht verwendeten Grafiken:** Im Ordner `figures/` befindet sich zusätzlich die Datei `vader_compound_distribution.png`. Diese Grafik zeigt die allgemeine Verteilung des `VADER Compound` Scores ohne direkten Bezug zu Alter oder Rating und stammt inhaltlich aus der Sentiment Analysis in `03_VADER.ipynb`. Sie gehört somit nicht zu den Regressions oder Robustheitsanalysen in `04_Regression.ipynb` beziehungsweise `05_Amazon_Robustness.ipynb`. Aus diesem Grund wurde sie keinem Abschnitt dieses Notebooks zugeordnet und nicht eingebunden.
+

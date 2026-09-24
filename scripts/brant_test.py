@@ -1,7 +1,7 @@
 """Brant-Test (1990, Separate-Fits-Ansatz) für die Proportional-Odds-Annahme.
 
 Extrahiert aus 04_Regression.ipynb (H2), damit dieselbe, dort bereits validierte Logik in
-06_Amazon_Robustness.ipynb (H3-Robustheitsprüfung) wiederverwendet werden kann, ohne Code zu
+05_Amazon_Robustness.ipynb (H3-Robustheitsprüfung) wiederverwendet werden kann, ohne Code zu
 duplizieren oder das dortige finale Notebook zu verändern.
 
 Nutzung:

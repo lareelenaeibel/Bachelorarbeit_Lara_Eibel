@@ -6,9 +6,13 @@ Dieses Notebook prüft:
 - **H2**: `Rating` ~ `Age` + `Age²` (ordinal, `OrderedModel`), inkl. Test der Proportional-Odds-Annahme (Brant-Test + LR-Cross-Check)
 - **H3**: Zusammenhang zwischen `VADER Compound` und `Rating`, ohne Alter oder weitere Kontrollvariablen, geprüft als `Rating ~ VADER Compound` (ordinal, `OrderedModel`, inkl. Proportional-Odds-Test), ergänzt um eine deskriptive Verteilungsanalyse sowie Pearson-/Spearman-Korrelation
 
-Für H1 und H2 wird jeweils ein **Basismodell**, ein **Hauptmodell** (mit Kontrollvariablen) sowie **Robustheitsprüfungen** gerechnet. `Positive Feedback Count` und `Recommended IND` werden aus den Hauptmodellen ausgeschlossen und nur als separate Robustheitsprüfungen mitgeführt. Der Grund dafür ist, dass beide Kennzahlen erst *nach* der Bewertung durch Reaktionen anderer Kund:innen beziehungsweise als direkte Konsequenz der eigenen Bewertung entstehen und somit "bad control" post-treatment-Variablen im Sinne von Angrist & Pischke (2009) sind. H3 kommt ohne diese Kontrollvariablen aus, da hier ausschliesslich der direkte Zusammenhang zwischen den beiden Bewertungsmethoden von Interesse ist.
+Für H1 und H2 werden jeweils ein Basismodell, ein Hauptmodell mit Kontrollvariablen sowie Robustheitsprüfungen berechnet. `Positive Feedback Count` und `Recommended IND` werden aus den Hauptmodellen ausgeschlossen und nur im Rahmen separater Robustheitsprüfungen berücksichtigt. Der Grund dafür ist, dass beide Kennzahlen erst nach der Bewertung entstehen, entweder als Reaktion anderer Kundinnen und Kunden oder als Konsequenz der eigenen Bewertung. Im Sinne von Angrist und Pischke (2009) handelt es sich damit um sogenannte "bad controls", die zeitlich nach der zu erklärenden Grösse liegen und deren Einbezug die Schätzung verzerren könnte. H3 kommt ohne diese Kontrollvariablen aus, da hier ausschliesslich der direkte Zusammenhang zwischen den beiden Bewertungsmethoden von Interesse ist.
 
-**Zentrierung von Age:** `Age` liegt nur in einem engen, rein positiven Wertebereich (18–99, Mittelwert ≈ 43). `Age` und `Age²` sind dadurch stark korreliert, was sich in einer hohen Condition Number niederschlägt (Multikollinearität, keine strukturelle Fehlspezifikation). Alle Modelle werden daher mit der **mittelwertzentrierten** Altersvariable `Age_c = Age - mean(Age)` und `Age_c² ` geschätzt. Das ist eine reine Reparametrisierung. Da alle Modelle einen freien Achsenabschnitt (OLS) bzw. freie Schwellenwerte (OrderedModel) besitzen, der/die eine konstante Verschiebung vollständig auffängt, bleiben Modellanpassung (R², Pseudo-R², AIC, Log-Likelihood) **exakt identisch**. Nur die Koeffizienten, ihre Standardfehler und die Condition Number ändern sich. Das wird weiter unten numerisch bestätigt. (Für H3 ist diese Zentrierung nicht relevant, da `Age` dort nicht als Prädiktor verwendet wird.)
+
+**Zentrierung von Age:** `Age` liegt in einem engen, ausschliesslich positiven Wertebereich von 18 bis 99 Jahren mit einem Mittelwert von etwa 43 Jahren. Dadurch sind `Age` und `Age²` stark korreliert, was sich in einer hohen Condition Number niederschlägt. Dies weist auf Multikollinearität hin, nicht auf eine strukturelle Fehlspezifikation des Modells. Alle Modelle werden daher mit der mittelwertzentrierten Altersvariable `Age_c = Age - mean(Age)` und deren Quadrat `Age_c²` geschätzt.
+
+Dabei handelt es sich um eine reine Reparametrisierung. Da alle Modelle über einen freien Achsenabschnitt bei OLS beziehungsweise freie Schwellenwerte beim OrderedModel verfügen, kann die konstante Verschiebung vollständig aufgefangen werden. Die Modellanpassung (R², Pseudo R², AIC, Log Likelihood) bleibt dadurch exakt identisch. Lediglich die Koeffizienten, deren Standardfehler und die Condition Number verändern sich, was weiter unten numerisch bestätigt wird. Für H3 ist diese Zentrierung nicht relevant, da `Age` dort nicht als Prädiktor verwendet wird.
+
 
 
 ```python
@@ -46,7 +50,7 @@ df.shape
 
 
 
-Die 22640 Zeilen stimmen mit dem Endergebnis aus `03_VADER.ipynb` überein. Die 18 Spalten setzen sich aus den vorherigen 13 (aus dem `03_VADER.ipynb` Notebook) sowie 5 neuen Spalten zusammen: den 4 VADER-Werten (Negative, Neutral, Positive, Compound) und `VADER Sentiment` (die Klassenkategorie).
+Die 22'640 Zeilen stimmen mit dem Endergebnis aus `03_VADER.ipynb` überein. Die 18 Spalten setzen sich aus den vorherigen 13 (aus dem `03_VADER.ipynb` Notebook) sowie 5 neuen Spalten zusammen: den 4 VADER-Werten (Negative, Neutral, Positive, Compound) und `VADER Sentiment` (die Klassenkategorie).
 
 ## Age zentrieren
 
@@ -156,11 +160,11 @@ df[["Age", "Age_sq", "Age_c", "Age_c_sq"]].describe()
 
 
 
-Der Mittelwert von `Age_c` liegt bei praktisch 0 (-4.02e-17, numerisch bedingte Rundungsabweichung), was die korrekte Zentrierung bestätigt. Das Alter selbst bewegt sich weiterhin im ursprünglichen Bereich von 18 bis 99 Jahren.
+Der Mittelwert von `Age_c` liegt bei praktisch 0 (-4.02e-17, eine numerisch bedingte Rundungsabweichung), was die korrekte Zentrierung bestätigt. Die ursprüngliche Variable `Age` weist weiterhin einen Wertebereich von 18 bis 99 Jahren auf.
 
 Zur einheitlichen Auswertung der nachfolgenden Modelle werden drei Hilfsfunktionen definiert:
 1. `params_table` fasst die Koeffizienten eines Modells übersichtlich zusammen
-2. `turning_point` berechnet den Wendepunkt der quadratischen Alters-Beziehung auf der ursprünglichen Altersskala
+2. `turning_point` berechnet das geschätzte Minimum der U-förmigen Alterskurve und rechnet diesen auf die ursprüngliche Altersskala zurück.
 3. `cond_number` quantifiziert die Multikollinearität einer Designmatrix.
 
 
@@ -178,7 +182,7 @@ def params_table(res, model_label):
 
 
 def turning_point(beta_age_c, beta_age_c_sq, mean_age=age_mean):
-    """Wendepunkt auf der echten Altersskala: zuerst in zentrierten Einheiten berechnen,
+    """Geschätztes Minimum auf der echten Altersskala: zuerst in zentrierten Einheiten berechnen,
     dann den Mittelwert zurücktransformieren (-beta_age_c / (2*beta_age_c_sq) + mean_age)."""
     return -beta_age_c / (2 * beta_age_c_sq) + mean_age
 
@@ -198,13 +202,9 @@ def cond_number(X):
 4. **Robustheitsmodell B**: Hauptmodell + `Positive Feedback Count` (post-treatment-Variable,
    s. u.)
 
-`Recommended IND` wird, genau wie `Positive Feedback Count`, als "bad control" im Sinne von
-Angrist & Pischke (2009) behandelt: Ob eine Kundin ein Produkt weiterempfiehlt, ist eine
-Konsequenz ihrer Bewertung (Sentiment und Rating), nicht deren Ursache. Die Variable wird daher
-aus dem Hauptmodell entfernt und stattdessen nur als separates Robustheitsmodell mitgeführt.
+`Recommended IND` wird, ebenso wie `Positive Feedback Count`, als "bad control" im Sinne von Angrist und Pischke (2009) behandelt. Die Entscheidung, ein Produkt weiterzuempfehlen, kann als Konsequenz der eigenen Bewertung betrachtet werden und liegt damit kausal nach den für die Analyse relevanten Bewertungsdimensionen Sentiment und Rating. Die Variable wird daher aus dem Hauptmodell ausgeschlossen und stattdessen nur in einem separaten Robustheitsmodell berücksichtigt.
 
-`Class Name` wird weiterhin nicht aufgenommen, da es inhaltlich mit `Department Name`
-überlappt.
+`Class Name` wird weiterhin nicht aufgenommen, da es inhaltlich mit `Department Name` überlappt.
 
 
 ## Modell-Datensatz vorbereiten
@@ -243,11 +243,9 @@ h1_df.isna().sum()
 
 
 
-13 Zeilen ohne `Division Name`/`Department Name` werden von `statsmodels` im Hauptmodell und in den beiden Robustheitsmodellen automatisch listenweise ausgeschlossen. Das Basismodell (nur Alter) nutzt weiterhin alle 22.640 Beobachtungen.
+Die 13 Zeilen mit fehlenden Werten bei `Division Name` beziehungsweise `Department Name` werden von `statsmodels` im Hauptmodell und in den beiden Robustheitsmodellen automatisch listenweise ausgeschlossen. Das Basismodell, das ausschliesslich die Altersvariablen enthält, nutzt hingegen alle 22'640 Beobachtungen.
 
-Zu jedem Modell wird zusätzlich kurz die **unzentrierte** Variante geschätzt, was ausschliesslich zum Vergleich der Condition Number und zur Bestätigung, dass die Modellgüte durch die Zentrierung unverändert bleibt, dient. Gespeichert/berichtet wird am Ende nur die zentrierte
-Variante.
-
+Zu jedem Modell wird zusätzlich die **unzentrierte** Variante geschätzt. Sie dient ausschliesslich dem Vergleich der Condition Number und bestätigt, dass die Modellgüte durch die Zentrierung unverändert bleibt. Gespeichert und berichtet wird abschliessend nur die zentrierte Variante.
 
 ## Basismodell: Age + Age²
 
@@ -263,8 +261,8 @@ print(h1_basis.summary())
     Dep. Variable:         vader_compound   R-squared:                       0.000
     Model:                            OLS   Adj. R-squared:                  0.000
     Method:                 Least Squares   F-statistic:                     4.336
-    Date:                Sun, 30 Aug 2026   Prob (F-statistic):             0.0131
-    Time:                        12:53:03   Log-Likelihood:                -9410.2
+    Date:                Wed, 09 Sep 2026   Prob (F-statistic):             0.0131
+    Time:                        13:09:02   Log-Likelihood:                -9410.2
     No. Observations:               22640   AIC:                         1.883e+04
     Df Residuals:                   22637   BIC:                         1.885e+04
     Df Model:                           2                                         
@@ -286,7 +284,8 @@ print(h1_basis.summary())
     [1] Standard Errors assume that the covariance matrix of the errors is correctly specified.
 
 
-Das Basismodell erklärt kaum Varianz (R² ≈ 0.000), ist jedoch als Gesamtmodell statistisch signifikant (p = 0.0131). Der lineare Term `age_c` ist nicht signifikant (p = 0.160), der quadratische Term `age_c_sq` hingegen schon (p = 0.003). Dies liefert einen ersten Hinweis auf einen nicht-linearen Zusammenhang zwischen Alter und Sentiment, auch wenn der Effekt insgesamt sehr schwach ausgeprägt ist. Die Condition Number von 328 liegt in einem unproblematischen Bereich.
+Das Basismodell erklärt praktisch keine Varianz (R² ≈ 0,000), ist jedoch als Gesamtmodell statistisch signifikant (p = 0,0131). Der lineare Term `age_c` ist nicht statistisch signifikant (p = 0,160), während der quadratische Term `age_c_sq` statistische Signifikanz aufweist (p = 0,003). Dies liefert einen ersten Hinweis auf einen nicht linearen Zusammenhang zwischen Alter und Sentiment, wobei die erklärte Varianz insgesamt sehr gering ist. Die Condition Number von 328 ist im Vergleich zur unzentrierten Modellspezifikation deutlich reduziert.
+
 
 ## Hauptmodell: + Division Name, Department Name
 
@@ -313,8 +312,8 @@ print(h1_haupt.summary())
     Dep. Variable:         vader_compound   R-squared:                       0.001
     Model:                            OLS   Adj. R-squared:                  0.001
     Method:                 Least Squares   F-statistic:                     2.887
-    Date:                Sun, 30 Aug 2026   Prob (F-statistic):            0.00206
-    Time:                        12:53:03   Log-Likelihood:                -9400.4
+    Date:                Wed, 09 Sep 2026   Prob (F-statistic):            0.00206
+    Time:                        13:09:02   Log-Likelihood:                -9400.4
     No. Observations:               22627   AIC:                         1.882e+04
     Df Residuals:                   22617   BIC:                         1.890e+04
     Df Model:                           9                                         
@@ -345,13 +344,14 @@ print(h1_haupt.summary())
     strong multicollinearity or other numerical problems.
 
 
-Ohne `Recommended IND` erklärt das Hauptmodell praktisch keine Varianz mehr (R² = 0.0011 statt 0.1920 mit `Recommended IND` im Modell), was zeigt, dass fast die gesamte vorherige Erklärungskraft von dieser post-treatment-Variable stammte. Der lineare Alterseffekt `age_c` ist jetzt nicht mehr signifikant (p = 0.141), der quadratische Term `age_c_sq` bleibt jedoch signifikant (p = 0.003). Der U-förmige, nicht-lineare Alterseffekt besteht also weiterhin, ist aber insgesamt schwach und wird primär vom quadratischen Term getragen. Von den Produktkategorien bleibt `Department Name` = Trend signifikant (p < 0.001).
+Ohne `Recommended IND` erklärt das Hauptmodell nur noch einen sehr geringen Anteil der Varianz (R² = 0,0011 gegenüber R² = 0,1920 bei Einbezug von `Recommended IND` (siehe Robustheitsmodell A weiter unten)). Dies zeigt, dass ein grosser Teil der zusätzlichen Erklärungskraft des erweiterten Modells mit dieser Post Treatment Variable verbunden ist. Der lineare Alterseffekt `age_c` ist nicht statistisch signifikant (p = 0,141), während der quadratische Term `age_c_sq` weiterhin statistische Signifikanz aufweist (p = 0,003). Damit bestehen weiterhin Hinweise auf einen U-förmigen, nicht linearen Zusammenhang zwischen Alter und Sentiment. Dieser Zusammenhang ist jedoch insgesamt schwach und wird primär durch den quadratischen Term getragen. Unter den Produktkategorien bleibt `Department Name` = Trend statistisch signifikant (p < 0,001).
 
+
+Die von `statsmodels` ausgegebene Warnung zur hohen Condition Number (siehe unter Notes [2]) ist nach der Zentrierung der Altersvariable nicht mehr primär auf die gemeinsame Verwendung von `Age` und `Age²` zurückzuführen. Sie dürfte vielmehr mit der Struktur und Skalierung der übrigen Prädiktoren, insbesondere den zahlreichen Dummy Variablen der Kategorievariablen, zusammenhängen (siehe Zentrierungserklärung oben).
 
 ## Robustheitsmodell A: Hauptmodell + Recommended IND
 
-**"Bad control"-Problematik (Angrist & Pischke, 2009):** Ob eine Kundin das Produkt weiterempfiehlt (`Recommended IND`), ist eine Konsequenz ihrer Bewertung und damit zeitlich nachgelagert zum gemessenen Sentiment (`VADER Compound`), nicht dessen Ursache. Eine Konditionierung auf eine solche post-treatment-Variable im Hauptmodell würde den geschätzten Alterseffekt potenziell verzerren. `Recommended IND` wird daher **nicht** ins Hauptmodell aufgenommen, sondern nur zur Robustheitsprüfung ergänzt.
-
+"Bad control" Problematik (Angrist und Pischke, 2009): Die Entscheidung einer Person, ein Produkt weiterzuempfehlen (`Recommended IND`), kann als Konsequenz ihrer Bewertung betrachtet werden und ist damit dem gemessenen Sentiment (`VADER Compound`) kausal nachgelagert, anstatt dessen Ursache zu sein. Die Kontrolle für eine solche Post Treatment Variable im Hauptmodell könnte den geschätzten Alterseffekt verzerren. `Recommended IND` wird daher nicht in das Hauptmodell aufgenommen, sondern nur im Rahmen einer Robustheitsprüfung berücksichtigt.
 
 
 ```python
@@ -372,8 +372,8 @@ print(h1_robust_a.summary())
     Dep. Variable:         vader_compound   R-squared:                       0.192
     Model:                            OLS   Adj. R-squared:                  0.192
     Method:                 Least Squares   F-statistic:                     537.5
-    Date:                Sun, 30 Aug 2026   Prob (F-statistic):               0.00
-    Time:                        12:53:03   Log-Likelihood:                -7001.0
+    Date:                Wed, 09 Sep 2026   Prob (F-statistic):               0.00
+    Time:                        13:09:02   Log-Likelihood:                -7001.0
     No. Observations:               22627   AIC:                         1.402e+04
     Df Residuals:                   22616   BIC:                         1.411e+04
     Df Model:                          10                                         
@@ -405,13 +405,12 @@ print(h1_robust_a.summary())
     strong multicollinearity or other numerical problems.
 
 
-Die Aufnahme von `Recommended IND` verändert das Modell drastisch: R² springt von 0.0011 (Hauptmodell) auf 0.1920, `Recommended IND` selbst trägt mit einem Koeffizienten von 0.4168 (p < 0.001) fast die gesamte zusätzliche Erklärungskraft bei. Zugleich wird `age_c` durch die Aufnahme von `Recommended IND` wieder signifikant (p < 0.001), der Wendepunkt verschiebt sich auf 57.13 Jahre (siehe Wendepunkt-Vergleich weiter unten). Dieses Muster belegt die eingangs beschriebene "bad control"-Problematik: `Recommended IND` steht dem Sentiment kausal nachgelagert und verändert bei Aufnahme ins Modell den geschätzten Alterseffekt spürbar. Es wird daher bewusst nicht im Hauptmodell, sondern nur hier zur Robustheitsprüfung geführt.
+Die Aufnahme von `Recommended IND` verändert die Modellergebnisse deutlich: R² steigt von 0,0011 im Hauptmodell auf 0,1920. `Recommended IND` weist dabei einen positiven und statistisch signifikanten Koeffizienten von 0,4168 auf (p < 0,001) und ist mit einem erheblichen Anstieg der erklärten Varianz verbunden. Zugleich wird `age_c` durch die Aufnahme von `Recommended IND` statistisch signifikant (p < 0,001), und das geschätzte Minimum verschiebt sich auf 57,13 Jahre (siehe Vergleich der geschätzten Minima weiter unten). Dieses Muster ist mit der eingangs beschriebenen "bad control" Problematik vereinbar: `Recommended IND` wird als dem Sentiment kausal nachgelagerte Variable betrachtet, deren Aufnahme die Schätzung des Alterseffekts spürbar verändert. Die Variable wird daher bewusst nicht im Hauptmodell, sondern nur im Rahmen dieser Robustheitsprüfung berücksichtigt.
 
 
 ## Robustheitsmodell B: Hauptmodell + Positive Feedback Count
 
-**"Bad control"-Problematik (Angrist & Pischke, 2009):** `Positive Feedback Count` zählt, wie viele andere Kund:innen eine Review nachträglich als hilfreich markiert haben. Dieser Wert entsteht also *zeitlich nach* der Review (und damit nach dem gemessenen Sentiment) und kann selbst vom Sentiment/Inhalt der Review beeinflusst sein. Eine Konditionierung auf eine solche post-treatment-Variable im Hauptmodell würde den geschätzten Alterseffekt potenziell verzerren. `Positive Feedback Count` wird daher **nicht** ins Hauptmodell aufgenommen, sondern nur zur Robustheitsprüfung ergänzt (analog zu Robustheitsmodell A und `Recommended IND`).
-
+"Bad control" Problematik (Angrist und Pischke, 2009): `Positive Feedback Count` gibt an, wie viele andere Personen eine Review nachträglich als hilfreich markiert haben. Dieser Wert entsteht somit zeitlich nach der Review und damit nach dem gemessenen Sentiment. Zudem kann er selbst vom Sentiment beziehungsweise vom Inhalt der Review beeinflusst sein. Die Kontrolle für eine solche Post Treatment Variable im Hauptmodell könnte den geschätzten Alterseffekt verzerren. `Positive Feedback Count` wird daher nicht in das Hauptmodell aufgenommen, sondern analog zu `Recommended IND` nur im Rahmen einer separaten Robustheitsprüfung berücksichtigt.
 
 
 ```python
@@ -434,8 +433,8 @@ print(h1_robust_b.summary())
     Dep. Variable:         vader_compound   R-squared:                       0.002
     Model:                            OLS   Adj. R-squared:                  0.001
     Method:                 Least Squares   F-statistic:                     3.738
-    Date:                Sun, 30 Aug 2026   Prob (F-statistic):           4.91e-05
-    Time:                        12:53:04   Log-Likelihood:                -9394.7
+    Date:                Wed, 09 Sep 2026   Prob (F-statistic):           4.91e-05
+    Time:                        13:09:02   Log-Likelihood:                -9394.7
     No. Observations:               22627   AIC:                         1.881e+04
     Df Residuals:                   22616   BIC:                         1.890e+04
     Df Model:                          10                                         
@@ -467,8 +466,7 @@ print(h1_robust_b.summary())
     strong multicollinearity or other numerical problems.
 
 
-Die Aufnahme von `Positive Feedback Count` verändert die Modellgüte kaum (R² steigt nur marginal von 0,001 auf 0,002), der Wendepunkt bleibt mit 47,06 Jahren nahe am Hauptmodell (47,42 Jahre). Anders als bei `Recommended IND` ist `Positive Feedback Count` hier selbst signifikant (Koeffizient −0,0014, p = 0,001), ohne jedoch, wie im Hauptmodell, einen signifikanten linearen Alterseffekt zu erzeugen: `age_c` bleibt weiterhin nicht signifikant (p = 0,189), während `age_c_sq` signifikant bleibt (p = 0,003). Die insgesamt verschwindend geringe Verbesserung von R² bestätigt dennoch die Entscheidung, `Positive Feedback Count` als post-treatment-Variable nicht ins Hauptmodell aufzunehmen.
-
+Die Aufnahme von `Positive Feedback Count` verändert die Modellgüte kaum. R² steigt lediglich von 0,001 auf 0,002, während das geschätzte Minimum mit 47,06 Jahren nahe am Wert des Hauptmodells von 47,42 Jahren liegt. `Positive Feedback Count` weist zwar einen statistisch signifikanten negativen Koeffizienten auf (Koeffizient = −0,0014, p = 0,001), verändert die Ergebnisse für die Altersvariablen jedoch kaum. `age_c` bleibt weiterhin statistisch nicht signifikant (p = 0,189), während `age_c_sq` statistisch signifikant bleibt (p = 0,003). Die geringe Veränderung der Modellgüte und des geschätzten Minimums zeigt, dass die zentralen Ergebnisse des Hauptmodells gegenüber der zusätzlichen Aufnahme von `Positive Feedback Count` weitgehend robust sind. Unabhängig davon wird die Variable aufgrund ihrer Einordnung als Post Treatment Variable nicht in das Hauptmodell aufgenommen.
 
 ## Condition Number vorher/nachher & Bestätigung gleicher Modellgüte
 
@@ -580,7 +578,7 @@ h1_cond_check
 
 
 
-Die Tabelle bestätigt die eingangs beschriebene Reparametrisierung: R² und AIC sind zwischen roher und zentrierter Variante in allen vier Modellen identisch (max. Abweichung im Bereich der Rechenungenauigkeit). Die Condition Number sinkt durch die Zentrierung dagegen deutlich, was die Multikollinearität spürbar reduziert.
+Die Tabelle bestätigt die eingangs beschriebene Reparametrisierung: R² und AIC sind zwischen der unzentrierten und der zentrierten Variante in allen vier Modellen identisch. Die maximale Abweichung liegt lediglich im Bereich numerischer Rechenungenauigkeit. Die Condition Number sinkt durch die Zentrierung hingegen deutlich, was insbesondere die numerische Multikollinearität zwischen dem linearen und dem quadratischen Altersterm reduziert.
 
 
 ## Modellvergleich (R², AIC)
@@ -643,8 +641,7 @@ print(h1_comparison)
     * p<.1, ** p<.05, ***p<.01
 
 
-Die Modellübersicht zeigt ein differenziertes Bild: Der quadratische Term `age_c_sq` ist über alle vier Modellspezifikationen hinweg signifikant, eine schwache Krümmung im Alterseffekt zeigt sich also durchgängig. Der lineare Term `age_c` ist dagegen nur in Robustheitsmodell A (mit `Recommended IND`) signifikant; in Hauptmodell und Robustheitsmodell B (jeweils ohne `Recommended IND`) ist er deutlich nicht signifikant (p = 0,141 bzw. p = 0,189). Da eine belastbare U-Form beide Terme voraussetzt, ist ausserhalb von Robustheitsmodell A kein robuster U-förmiger Alterseffekt nachweisbar, nur die schwache Krümmung selbst. Die deutlichste Verbesserung der Modellgüte entsteht durch `Recommended IND` selbst (Robustheitsmodell A), nicht durch die Kontrollvariablen des Hauptmodells oder durch `Positive Feedback Count`.
-
+Die Modellübersicht zeigt ein differenziertes Bild: Der quadratische Term `age_c_sq` ist über alle vier Modellspezifikationen hinweg statistisch signifikant, sodass sich durchgängig Hinweise auf eine Krümmung des Zusammenhangs zwischen Alter und Sentiment zeigen. Der lineare Term `age_c` ist dagegen nur in Robustheitsmodell A mit `Recommended IND` statistisch signifikant. Im Hauptmodell und in Robustheitsmodell B ist er nicht statistisch signifikant (p = 0,141 beziehungsweise p = 0,189). Die fehlende Signifikanz des linearen Terms schliesst eine U-förmige Beziehung jedoch nicht grundsätzlich aus. Für deren Beurteilung sind insbesondere das Vorzeichen und die Signifikanz des quadratischen Terms sowie die Lage des geschätzten Minimums innerhalb des beobachteten Altersbereichs relevant. Insgesamt ist der Zusammenhang schwach ausgeprägt und sollte entsprechend vorsichtig interpretiert werden. Die deutlichste Verbesserung der Modellgüte zeigt sich bei der Aufnahme von `Recommended IND` in Robustheitsmodell A, während die Kontrollvariablen des Hauptmodells und `Positive Feedback Count` nur einen geringen zusätzlichen Beitrag zur erklärten Varianz leisten.
 
 
 ```python
@@ -732,6 +729,8 @@ Die Beobachtungszahl sinkt von 22'640 im Basismodell auf 22'627 im Hauptmodell u
 
 ## Ergebnistabelle & Speichern
 
+Abschliessend werden alle Koeffizienten sowie die zentralen Modellkennzahlen (geschätztes Minimum, R², AIC und Condition Number) der vier H1 Modelle in einer gemeinsamen Tabelle zusammengeführt und unter `results/h1_regression_updated.csv` gespeichert. Zusätzlich werden die vollständigen Modellzusammenfassungen sowie eine kompakte Übersicht der Gütemasse in separaten Dateien abgelegt.
+
 
 ```python
 h1_models = {
@@ -752,7 +751,7 @@ for label, res in h1_models.items():
     cond_raw = h1_cond_check.loc[h1_cond_check["Modelltyp"] == label, "Cond_No_roh"].iloc[0]
     cond_c = h1_cond_check.loc[h1_cond_check["Modelltyp"] == label, "Cond_No_zentriert"].iloc[0]
     for term, value in [
-        ("Wendepunkt (Age)", tp),
+        ("Geschätztes Minimum (Age)", tp),
         ("R2", res.rsquared),
         ("Adj. R2", res.rsquared_adj),
         ("AIC", res.aic),
@@ -904,6 +903,10 @@ h1_results_updated
 
 
 
+Die Tabelle liegt im langen Format vor. Neben den Koeffizienten mit Standardfehler, Teststatistik und p-Wert enthält sie auch zusammenfassende Modellkennzahlen wie das geschätzte Minimum, R² und die Condition Number. Für diese Kennzahlen bleiben die zusätzlichen Spalten für Standardfehler, Teststatistik und p-Wert naturgemäss leer (`NaN`).
+
+Abschliessend werden die vollständigen Regressionsprotokolle aller vier Modelle sowie der zusammenfassende Modellvergleich als Textdateien im Ordner `results` abgelegt. Die Gütemasse werden zusätzlich als CSV Datei gespeichert. Diese Dateien dienen als Nachweis der vollständigen Modellergebnisse und als Grundlage für die Ergebnisdarstellung in Kapitel 4.
+
 
 ```python
 with open(RESULTS_DIR / "h1_regression_basismodell.txt", "w") as f:
@@ -940,9 +943,325 @@ sorted(p.name for p in RESULTS_DIR.glob("h1_*"))
 
 
 
+## Visualisierung: Alterseffekt auf Sentiment (H1)
+
+Ergänzend zu den Koeffiziententabellen wird der im H1 Hauptmodell geschätzte Alterseffekt grafisch dargestellt. Die Abbildung zeigt die beobachteten Mittelwerte von `VADER Compound` je 5 Jahres Altersgruppe mit 95 Prozent Konfidenzintervallen auf Basis der t-Verteilung sowie die vom Hauptmodell vorhergesagte Kurve. Die Kurve wird für die Referenzkategorien ausgewertet (`Division Name` = General, `Department Name` = Bottoms, siehe Hinweis zur Dummy Kodierung bei H2). Da alle Dummy Koeffizienten für diese Referenzkategorien den Wert null annehmen, wird die Vorhersage ausschliesslich durch den Intercept sowie `age_c` und `age_c_sq` bestimmt.
+
+
+```python
+from scipy.stats import t as t_dist
+
+# 5-Jahres-Altersgruppen: 18-22, 23-27, ..., 93-97, 98-99 (letzte Gruppe kürzer, da Age nur bis 99 reicht)
+h1_age_bin_edges = list(range(18, 99, 5)) + [100]
+h1_age_bin_labels = [f"{h1_age_bin_edges[i]}-{h1_age_bin_edges[i + 1] - 1}" for i in range(len(h1_age_bin_edges) - 1)]
+h1_age_groups = pd.cut(df["Age"], bins=h1_age_bin_edges, right=False, labels=h1_age_bin_labels)
+
+h1_group_stats = df.groupby(h1_age_groups, observed=True)["VADER Compound"].agg(["mean", "std", "size"]).reset_index()
+h1_group_stats.columns = ["Altersgruppe", "compound_mean", "compound_std", "n"]
+h1_group_stats["age_mean_obs"] = df.groupby(h1_age_groups, observed=True)["Age"].mean().values
+h1_group_stats["sem"] = h1_group_stats["compound_std"] / np.sqrt(h1_group_stats["n"])
+h1_group_stats["ci95"] = h1_group_stats["sem"] * t_dist.ppf(0.975, h1_group_stats["n"] - 1)
+
+# CI-Grenzen auf den gültigen Wertebereich von VADER Compound [-1, 1] clippen (nur die Fehlerbalken,
+# nicht der Punktschätzer selbst, der ohnehin stets im gültigen Bereich liegt). Bei kleinen
+# Altersgruppen (v.a. am oberen Altersrand) reicht das unclippte CI sonst ausserhalb dieses Bereichs.
+h1_group_stats["ci_lower"] = (h1_group_stats["compound_mean"] - h1_group_stats["ci95"]).clip(lower=-1.0, upper=1.0)
+h1_group_stats["ci_upper"] = (h1_group_stats["compound_mean"] + h1_group_stats["ci95"]).clip(lower=-1.0, upper=1.0)
+h1_yerr = np.vstack([
+    h1_group_stats["compound_mean"] - h1_group_stats["ci_lower"],
+    h1_group_stats["ci_upper"] - h1_group_stats["compound_mean"],
+])
+
+# Gefittete Kurve des H1-Hauptmodells an der Referenzkategorie (alle Dummy-Koeffizienten = 0):
+# vader_compound_hat = Intercept + beta_age_c * age_c + beta_age_c_sq * age_c_sq
+h1_age_grid = np.linspace(df["Age"].min(), df["Age"].max(), 300)
+h1_age_c_grid = h1_age_grid - age_mean
+h1_fitted_curve = (
+    h1_haupt.params["Intercept"]
+    + h1_haupt.params["age_c"] * h1_age_c_grid
+    + h1_haupt.params["age_c_sq"] * h1_age_c_grid ** 2
+)
+tp_h1_haupt = turning_point(h1_haupt.params["age_c"], h1_haupt.params["age_c_sq"])
+
+fig, ax = plt.subplots(figsize=(8, 5))
+ax.errorbar(
+    h1_group_stats["age_mean_obs"], h1_group_stats["compound_mean"], yerr=h1_yerr,
+    fmt="o", color="#4C72B0", ecolor="#4C72B0", elinewidth=1.2, capsize=3, markersize=5,
+    label="Beobachteter Mittelwert je Altersgruppe (95%-CI, auf [-1, 1] geclippt)",
+)
+ax.plot(h1_age_grid, h1_fitted_curve, color="#4C72B0", linewidth=2,
+        label="Gefittetes Hauptmodell (Referenzkategorie)")
+ax.axvline(tp_h1_haupt, color="#4C72B0", linestyle="--", linewidth=1.2,
+           label=f"Geschätztes Minimum \u2248 {tp_h1_haupt:.1f} Jahre")
+ax.set_xlabel("Alter (Jahre)")
+ax.set_ylabel("VADER Compound Score")
+ax.set_title("Sentiment nach Alter: Beobachtete Mittelwerte und gefittetes Hauptmodell (H1)")
+ax.legend(fontsize=8)
+fig.tight_layout()
+fig.savefig(FIGURES_DIR / "h1_age_fitted_curve.png", dpi=150)
+plt.show()
+
+print(f"Geschätztes Minimum H1-Hauptmodell (für Grafik verwendet): {tp_h1_haupt:.2f} Jahre")
+h1_group_stats
+```
+
+
+    
+![png](04_Regression_export_files/04_Regression_export_42_0.png)
+    
+
+
+    Geschätztes Minimum H1-Hauptmodell (für Grafik verwendet): 47.42 Jahre
+
+
+
+
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>Altersgruppe</th>
+      <th>compound_mean</th>
+      <th>compound_std</th>
+      <th>n</th>
+      <th>age_mean_obs</th>
+      <th>sem</th>
+      <th>ci95</th>
+      <th>ci_lower</th>
+      <th>ci_upper</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>18-22</td>
+      <td>0.789053</td>
+      <td>0.327205</td>
+      <td>387</td>
+      <td>20.852713</td>
+      <td>0.016633</td>
+      <td>0.032702</td>
+      <td>0.756351</td>
+      <td>0.821755</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>23-27</td>
+      <td>0.763254</td>
+      <td>0.347913</td>
+      <td>1543</td>
+      <td>25.225535</td>
+      <td>0.008857</td>
+      <td>0.017373</td>
+      <td>0.745881</td>
+      <td>0.780627</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>28-32</td>
+      <td>0.728048</td>
+      <td>0.378761</td>
+      <td>2434</td>
+      <td>30.173377</td>
+      <td>0.007677</td>
+      <td>0.015055</td>
+      <td>0.712994</td>
+      <td>0.743103</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>33-37</td>
+      <td>0.747637</td>
+      <td>0.359554</td>
+      <td>3843</td>
+      <td>35.023159</td>
+      <td>0.005800</td>
+      <td>0.011371</td>
+      <td>0.736266</td>
+      <td>0.759009</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>38-42</td>
+      <td>0.732338</td>
+      <td>0.372986</td>
+      <td>3903</td>
+      <td>39.805022</td>
+      <td>0.005970</td>
+      <td>0.011705</td>
+      <td>0.720633</td>
+      <td>0.744043</td>
+    </tr>
+    <tr>
+      <th>5</th>
+      <td>43-47</td>
+      <td>0.739028</td>
+      <td>0.359751</td>
+      <td>2898</td>
+      <td>45.025880</td>
+      <td>0.006683</td>
+      <td>0.013103</td>
+      <td>0.725924</td>
+      <td>0.752131</td>
+    </tr>
+    <tr>
+      <th>6</th>
+      <td>48-52</td>
+      <td>0.715883</td>
+      <td>0.391306</td>
+      <td>2270</td>
+      <td>49.798678</td>
+      <td>0.008213</td>
+      <td>0.016106</td>
+      <td>0.699777</td>
+      <td>0.731989</td>
+    </tr>
+    <tr>
+      <th>7</th>
+      <td>53-57</td>
+      <td>0.740567</td>
+      <td>0.362937</td>
+      <td>2053</td>
+      <td>54.853385</td>
+      <td>0.008010</td>
+      <td>0.015709</td>
+      <td>0.724858</td>
+      <td>0.756276</td>
+    </tr>
+    <tr>
+      <th>8</th>
+      <td>58-62</td>
+      <td>0.759918</td>
+      <td>0.346540</td>
+      <td>1478</td>
+      <td>60.014885</td>
+      <td>0.009014</td>
+      <td>0.017682</td>
+      <td>0.742237</td>
+      <td>0.777600</td>
+    </tr>
+    <tr>
+      <th>9</th>
+      <td>63-67</td>
+      <td>0.750143</td>
+      <td>0.374268</td>
+      <td>1121</td>
+      <td>64.886708</td>
+      <td>0.011178</td>
+      <td>0.021933</td>
+      <td>0.728210</td>
+      <td>0.772076</td>
+    </tr>
+    <tr>
+      <th>10</th>
+      <td>68-72</td>
+      <td>0.744162</td>
+      <td>0.364609</td>
+      <td>429</td>
+      <td>69.433566</td>
+      <td>0.017604</td>
+      <td>0.034600</td>
+      <td>0.709562</td>
+      <td>0.778762</td>
+    </tr>
+    <tr>
+      <th>11</th>
+      <td>73-77</td>
+      <td>0.689690</td>
+      <td>0.398611</td>
+      <td>143</td>
+      <td>74.412587</td>
+      <td>0.033333</td>
+      <td>0.065894</td>
+      <td>0.623795</td>
+      <td>0.755584</td>
+    </tr>
+    <tr>
+      <th>12</th>
+      <td>78-82</td>
+      <td>0.765590</td>
+      <td>0.337469</td>
+      <td>58</td>
+      <td>79.758621</td>
+      <td>0.044312</td>
+      <td>0.088733</td>
+      <td>0.676857</td>
+      <td>0.854323</td>
+    </tr>
+    <tr>
+      <th>13</th>
+      <td>83-87</td>
+      <td>0.824079</td>
+      <td>0.365580</td>
+      <td>61</td>
+      <td>83.655738</td>
+      <td>0.046808</td>
+      <td>0.093629</td>
+      <td>0.730449</td>
+      <td>0.917708</td>
+    </tr>
+    <tr>
+      <th>14</th>
+      <td>88-92</td>
+      <td>0.855225</td>
+      <td>0.137396</td>
+      <td>12</td>
+      <td>90.083333</td>
+      <td>0.039663</td>
+      <td>0.087297</td>
+      <td>0.767928</td>
+      <td>0.942522</td>
+    </tr>
+    <tr>
+      <th>15</th>
+      <td>93-97</td>
+      <td>0.625580</td>
+      <td>0.652474</td>
+      <td>5</td>
+      <td>93.600000</td>
+      <td>0.291795</td>
+      <td>0.810154</td>
+      <td>-0.184574</td>
+      <td>1.000000</td>
+    </tr>
+    <tr>
+      <th>16</th>
+      <td>98-99</td>
+      <td>0.862550</td>
+      <td>0.174585</td>
+      <td>2</td>
+      <td>99.000000</td>
+      <td>0.123450</td>
+      <td>1.568581</td>
+      <td>-0.706031</td>
+      <td>1.000000</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+
+
+Die breiten Konfidenzintervalle bei sehr hohem Alter ab etwa 85 Jahren spiegeln die geringe Fallzahl in diesen Altersgruppen wider und relativieren die Aussagekraft der Kurve am rechten Rand.
+
 ## Residualdiagnostik (H1)
 
-Prüft die im Methodikteil angekündigten OLS-Annahmen für das **Hauptmodell** (primär) und, kurz zum Vergleich, für das **Basismodell**: Linearität, Homoskedastizität, Normalverteilung der Residuen, sowie der F-Test der Gesamtsignifikanz.
+Geprüft werden die im Methodikteil beschriebenen OLS Annahmen für das Hauptmodell und ergänzend für das Basismodell: Linearität, Homoskedastizität und Normalverteilung der Residuen sowie die Gesamtsignifikanz des Modells mittels F Test.
 
 ### Linearität & Homoskedastizität: Residuen vs. Fitted
 
@@ -967,15 +1286,13 @@ plt.show()
 
 
     
-![png](04_Regression_export_files/04_Regression_export_39_0.png)
+![png](04_Regression_export_files/04_Regression_export_46_0.png)
     
 
 
-Bei der visuellen Beurteilung gilt: Zeigt der Plot **kein systematisches/erkennbares Muster** (z.B. eine Bogenform), deutet das auf Linearität hin, der Zusammenhang lässt sich also gut durch eine gerade bzw. leicht gekrümmte Linie beschreiben. Nimmt die Streuung der Punkte dagegen mit steigenden Fitted Values sichtbar zu oder ab (eine sogenannte **trichterförmige Verteilung**), deutet das auf Heteroskedastizität hin, das heisst, die Streuung der Fehler ist nicht über den gesamten Wertebereich hinweg konstant. Ob tatsächlich Heteroskedastizität vorliegt, wird im Anschluss formal mit dem Breusch-Pagan-Test geprüft.
+Bei der visuellen Beurteilung gilt: Zeigt der Plot der Residuen gegen die vorhergesagten Werte kein systematisches oder erkennbares Muster, beispielsweise eine ausgeprägte Bogenform, spricht dies dafür, dass die funktionale Form des Modells angemessen spezifiziert ist. Nimmt die Streuung der Residuen dagegen mit steigenden Fitted Values sichtbar zu oder ab, beispielsweise in Form einer trichterförmigen Verteilung, deutet dies auf Heteroskedastizität hin. In diesem Fall ist die Varianz der Fehler nicht über den gesamten Wertebereich hinweg konstant. Ob tatsächlich Heteroskedastizität vorliegt, wird anschliessend formal mit dem Breusch Pagan Test geprüft.
 
-Aufgrund der überwiegend kategorialen Kontrollvariablen (`Division Name`, `Department Name`) entstehen im Plot mehrere senkrechte Punktbänder statt einer gleichmässig verteilten Wolke, jedes Band entspricht einer Kombination dieser Kategorien mit dem jeweiligen Alter. Eine klassische Bogenform, die auf Nichtlinearität hindeuten würde, ist nicht erkennbar; eine eindeutige trichterförmige Streuung ebenfalls nicht. Ob dennoch Heteroskedastizität vorliegt, wird daher formal über den Breusch-Pagan-Test geprüft, der visuell
-schwer erkennbare Muster zuverlässiger aufdecken kann.
-
+Aufgrund der überwiegend kategorialen Kontrollvariablen (`Division Name` und `Department Name`) entstehen im Plot mehrere senkrechte Punktbänder anstelle einer gleichmässig verteilten Punktwolke. Jedes Band entspricht einer Kombination dieser Kategorien mit dem jeweiligen Alter. Eine ausgeprägte Bogenform, die auf eine unzureichende funktionale Spezifikation hindeuten könnte, ist nicht erkennbar. Auch eine eindeutige trichterförmige Streuung zeigt sich nicht. Ob dennoch Hinweise auf Heteroskedastizität vorliegen, wird daher ergänzend mit dem Breusch Pagan Test formal geprüft.
 
 
 ```python
@@ -1040,10 +1357,9 @@ pd.DataFrame(bp_results).T
 
 
 
-Weder Hauptmodell (BP p = 0.153) noch Basismodell (BP p = 0.712) zeigen signifikante Heteroskedastizität. Das unterscheidet sich deutlich vom bisherigen Befund mit `Recommended IND` im Hauptmodell (BP hochsignifikant): Die dort beobachtete Heteroskedastizität wurde offenbar primär durch diese post-treatment-Variable verursacht, nicht durch `Division Name`/`Department Name` oder den Alterseffekt selbst.
+Weder für das Hauptmodell (BP p = 0,153) noch für das Basismodell (BP p = 0,712) ergeben sich statistisch signifikante Hinweise auf Heteroskedastizität. Dies unterscheidet sich deutlich vom früheren Modell mit `Recommended IND`, für das der Breusch Pagan Test ein statistisch signifikantes Ergebnis zeigte. Der Vergleich deutet darauf hin, dass die Aufnahme von `Recommended IND` mit der dort festgestellten Heteroskedastizität zusammenhängt. Eine eindeutige kausale Zuordnung der Heteroskedastizität zu dieser Variable ist auf Basis des Modellvergleichs jedoch nicht möglich.
 
-
-### Normalverteilung der Residuen: Q-Q-Plot, Jarque-Bera, Skewness/Kurtosis
+### Normalverteilung der Residuen: Q-Q-Plot, Jarque-Bera, Skewness und Kurtosis
 
 
 ```python
@@ -1057,7 +1373,7 @@ plt.show()
 
 
     
-![png](04_Regression_export_files/04_Regression_export_45_0.png)
+![png](04_Regression_export_files/04_Regression_export_52_0.png)
     
 
 
@@ -1124,11 +1440,9 @@ pd.DataFrame(normality_results).T
 
 
 
-Die Kennzahlen bestätigen quantitativ, was der Q-Q-Plot bereits zeigt: eine Skewness von rund -2.4 (Hauptmodell und Basismodell praktisch identisch) deutet auf eine deutlich linksschiefe Verteilung hin, das heisst, es gibt vergleichsweise viele stark negative Residuen bei einer Konzentration der übrigen Werte im positiven Bereich (genau das hat auch bereits das VADER Compound Histogramm gezeigt). Die Exzess-Kurtosis von rund 5.7 (Richtwert für Unbedenklichkeit: < 1) zeigt eine spitzgipflige Verteilung mit mehr extremen Ausreissern als bei einer Normalverteilung zu erwarten wäre. Beide Werte liegen damit deutlich
-ausserhalb der als unproblematisch geltenden Richtwerte. Dass Haupt- und Basismodell hier praktisch identische Werte zeigen, passt zum schwachen R² des Hauptmodells ohne `Recommended IND`: Die Kontrollvariablen `Division Name`/`Department Name` verändern die Form der Residuenverteilung kaum.
+Die Kennzahlen bestätigen quantitativ die im Q-Q-Plot erkennbare Abweichung von der Normalverteilung. Eine Skewness von rund −2,4, die im Hauptmodell und Basismodell nahezu identisch ausfällt, weist auf eine deutlich linksschiefe Residuenverteilung mit einem ausgeprägten linken Verteilungsschwanz hin. Die Exzess Kurtosis von rund 5,7 liegt deutlich über dem Wert von 0, der für eine Normalverteilung zu erwarten wäre, und deutet auf eine leptokurtische Verteilung mit vergleichsweise schweren Verteilungsrändern hin. Beide Kennzahlen sprechen somit für eine deutliche Abweichung der Residuen von der Normalverteilung. Dass Hauptmodell und Basismodell nahezu identische Werte aufweisen, passt zur sehr geringen zusätzlichen Erklärungskraft des Hauptmodells. Die Aufnahme der Kontrollvariablen `Division Name` und `Department Name` verändert die Form der Residuenverteilung demnach nur geringfügig.
 
-
-**Zur Interpretation bei N ≈ 22.627:** Ein formaler Normalitätstest wie Shapiro-Wilk (oder auch Jarque-Bera) wird bei derart grossen Stichproben praktisch **immer signifikant**, selbst bei nur minimalen, praktisch irrelevanten Abweichungen von der Normalverteilung. Der p-Wert ist hier daher **kein sinnvolles Entscheidungskriterium**. Die Interpretation stützt sich stattdessen primär auf den **Q-Q-Plot** (systematische Abweichungen an den Rändern?) und die **Größenordnung** von Skewness/Kurtosis (Richtwerte: |Skewness| < 1 und |Exzess-Kurtosis| < 1 gelten meist als praktisch unbedenklich, unabhängig vom p-Wert des Jarque-Bera-Tests).
+Zur Interpretation bei N ≈ 22'627 ist zu berücksichtigen, dass formale Normalitätstests wie der Shapiro Wilk Test oder der Jarque Bera Test bei sehr grossen Stichproben bereits auf geringe Abweichungen von der Normalverteilung empfindlich reagieren können. Der p-Wert allein ist daher kein ausreichendes Entscheidungskriterium für die praktische Beurteilung der Normalitätsannahme. Die Interpretation stützt sich deshalb primär auf den Q-Q-Plot und ergänzend auf die Grössenordnung von Skewness und Exzess Kurtosis. Werte von |Skewness| < 1 und |Exzess Kurtosis| < 1 können dabei als grobe Orientierungswerte für geringe Abweichungen von der Normalverteilung herangezogen werden, sollten jedoch nicht als starre Grenzwerte interpretiert werden.
 
 ### F-Test der Gesamtsignifikanz
 
@@ -1189,13 +1503,11 @@ f_test_results
 
 
 
-Der F-Test prüft die Nullhypothese, dass alle Koeffizienten (ausser dem Achsenabschnitt) gleichzeitig null sind, das heisst, das Modell als Ganzes hätte keine Erklärungskraft. Beide Modelle sind formal signifikant (Hauptmodell F = 2.9, p = 0.002; Basismodell F = 4.3, p = 0.013), die Nullhypothese wird also in beiden Fällen verworfen. Praktisch bedeutsam ist das allerdings in keinem der beiden Fälle: R² liegt beim Hauptmodell nur bei 0.0011 und beim Basismodell bei 0.0004. Ohne `Recommended IND` erklärt also auch das Hauptmodell kaum Varianz, die statistische Signifikanz des F-Tests ist bei N ≈ 22.627 vor allem dem grossen Stichprobenumfang geschuldet.
-
+Der F Test prüft die Nullhypothese, dass alle Koeffizienten mit Ausnahme des Achsenabschnitts gemeinsam null sind und das Modell somit insgesamt keine statistische Erklärungskraft besitzt. Beide Modelle sind als Gesamtmodelle statistisch signifikant (Hauptmodell: F = 2,9, p = 0,002; Basismodell: F = 4,3, p = 0,013), sodass die Nullhypothese in beiden Fällen verworfen wird. Die praktische Erklärungskraft ist jedoch in beiden Modellen sehr gering: R² beträgt im Hauptmodell lediglich 0,0011 und im Basismodell 0,0004. Ohne `Recommended IND` erklärt somit auch das Hauptmodell nur einen sehr geringen Anteil der Varianz. Angesichts der grossen Stichprobe von N ≈ 22'627 können bereits sehr kleine Effekte statistische Signifikanz erreichen, weshalb die Ergebnisse des F Tests stets gemeinsam mit der sehr geringen erklärten Varianz interpretiert werden sollten.
 
 ### Heteroskedastizitätsrobuste Standardfehler (HC3), falls nötig
 
-Da Breusch-Pagan im neuen Hauptmodell (ohne `Recommended IND`) nicht mehr signifikant ist (siehe oben), ist anders als zuvor keine HC3-Neuschätzung nötig. Die folgende Zelle prüft das automatisch anhand des Breusch-Pagan p-Werts und übernimmt in diesem Fall die klassischen Standardfehler unverändert.
-
+Da der Breusch Pagan Test im neuen Hauptmodell ohne `Recommended IND` nicht signifikant ausfällt (siehe oben), ergibt sich nach der festgelegten Entscheidungsregel kein Anlass für eine Neuschätzung mit HC3 robusten Standardfehlern. Die folgende Zelle prüft dies automatisch anhand des p Werts des Breusch Pagan Tests. Da dieser oberhalb des festgelegten Signifikanzniveaus liegt, werden die klassischen Standardfehler des OLS Modells unverändert übernommen.
 
 
 ```python
@@ -1369,8 +1681,7 @@ hc3_comparison
 
 
 
-Da Breusch-Pagan im neuen Hauptmodell nicht signifikant war, entspricht `h1_haupt_hc3` exakt `h1_haupt` (siehe Bedingung oben), Standardfehler und p-Werte sind in der Vergleichstabelle daher identisch. Eine HC3-Korrektur ist für das neue Hauptmodell nicht nötig.
-
+Da der Breusch Pagan Test im neuen Hauptmodell nicht signifikant ausfällt, entspricht `h1_haupt_hc3` aufgrund der oben definierten Bedingung exakt `h1_haupt`. Die Standardfehler und p Werte sind in der Vergleichstabelle daher identisch. Nach der festgelegten Entscheidungsregel wird für das neue Hauptmodell keine HC3 Korrektur vorgenommen.
 
 ### Speichern
 
@@ -1531,35 +1842,35 @@ h1_residual_diagnostics
 
 
 
-### Einschätzung: Sind die OLS-Annahmen für H1 hinreichend erfüllt?
+### Einschätzung: Sind die OLS Annahmen für H1 hinreichend erfüllt?**
 
-**Deutlich besseres Bild als zuvor: Nur noch eine Annahme ist strukturell verletzt und sollte als Limitation benannt werden, Homoskedastizität ist inzwischen unauffällig.**
+Insgesamt zeigt sich gegenüber dem ursprünglichen Modell ein deutlich unauffälligeres Bild. Insbesondere ergeben sich für das aktuelle Hauptmodell keine statistisch signifikanten Hinweise mehr auf Heteroskedastizität. Eine deutliche Abweichung von der Normalverteilung der Residuen bleibt jedoch bestehen und sollte als methodische Limitation berücksichtigt werden.
 
-- **Linearität:** Der Residuen-vs-Fitted-Plot zeigt kein grob systematisches Bogenmuster, die lineare/quadratische Spezifikation in `age_c`/`age_c_sq` erscheint somit als Funktionsform angemessen. Das bestätigt allerdings nur die gewählte Modellform, nicht die inhaltliche Bedeutsamkeit des Effekts: `age_c` selbst ist im Hauptmodell nicht signifikant (p = 0,141), nur der quadratische Term `age_c_sq` bleibt es (p = 0,003).
-- **Homoskedastizität, nach Entfernung von `Recommended IND` unauffällig:** Breusch-Pagan ist im neuen Hauptmodell nicht mehr signifikant (BP = 13,21, p = 0,153) und liegt damit in einer ähnlichen Grössenordnung wie das Basismodell (BP = 0,68, p = 0,71).
+- **Funktionale Form:** Der Residuen gegen Fitted Plot zeigt kein ausgeprägtes systematisches Bogenmuster. Dies spricht dafür, dass die gewählte funktionale Spezifikation mit `age_c` und `age_c_sq` grundsätzlich angemessen ist. Daraus lässt sich jedoch keine Aussage über die praktische Bedeutsamkeit des Alterseffekts ableiten. Im Hauptmodell ist `age_c` nicht statistisch signifikant (p = 0,141), während der quadratische Term `age_c_sq` signifikant bleibt (p = 0,003). Die fehlende Signifikanz des linearen Terms schliesst eine U förmige Beziehung dabei nicht grundsätzlich aus.
 
-  Die im bisherigen Hauptmodell (mit `Recommended IND`) beobachtete Heteroskedastizität (BP = 1.834,8, p < 0,001) wurde also offenbar primär durch diese post-treatment-Variable verursacht, nicht durch `Division Name`/`Department Name` oder den Alterseffekt selbst.
+- **Homoskedastizität:** Der Breusch Pagan Test ist im neuen Hauptmodell ohne `Recommended IND` nicht signifikant (BP = 13,21, p = 0,153). Auch für das Basismodell ergeben sich keine statistisch signifikanten Hinweise auf Heteroskedastizität (BP = 0,68, p = 0,712). Dies unterscheidet sich deutlich vom ursprünglichen Hauptmodell mit `Recommended IND`, für das der Breusch Pagan Test ein hochsignifikantes Ergebnis zeigte (BP = 1'834,8, p < 0,001). Der Modellvergleich deutet somit darauf hin, dass die Aufnahme von `Recommended IND` mit der zuvor festgestellten Heteroskedastizität zusammenhing. Eine eindeutige kausale Zuordnung der Heteroskedastizität zu dieser Variable ist anhand dieses Vergleichs jedoch nicht möglich.
 
-  **Keine HC3-Korrektur mehr nötig:** Da die Bedingung `bp_pvalue < 0.05` nicht erfüllt ist, übernimmt die automatische Prüfung die klassischen Standardfehler unverändert (`h1_haupt_hc3 = h1_haupt`).
+    **HC3 robuste Standardfehler:** Da der Breusch Pagan Test im aktuellen Hauptmodell nicht signifikant ausfällt, ist die festgelegte Bedingung `bp_pvalue < 0.05` für die Verwendung von HC3 robusten Standardfehlern nicht erfüllt. Die automatische Prüfung übernimmt daher die klassischen Standardfehler unverändert (`h1_haupt_hc3 = h1_haupt`). Nach der festgelegten Entscheidungsregel wird für das aktuelle Hauptmodell somit keine HC3 Korrektur vorgenommen.
 
-- **Normalverteilung der Residuen, weiterhin verletzt, praktisch relevant:** Skewness liegt bei rund -2,43, Exzess-Kurtosis bei rund 5,7, für Haupt- und Basismodell praktisch identisch und damit deutlich ausserhalb der Richtwerte (|Skewness| < 1, |Kurtosis| < 1) für praktische Unbedenklichkeit. Das ist inhaltlich weiterhin plausibel: `VADER Compound` ist bei 1 gedeckelt und viele Reviews clustern nahe am sehr positiven Rand, während negative Reviews einen langen linken Ausläufer bilden. Das ist eine klassische linksschiefe, spitzgipflige (leptokurtische) Verteilung. Der Jarque-Bera-Test ist entsprechend hochsignifikant, was hier nicht nur dem grossen N geschuldet ist (siehe Grössenordnung von Skewness/Kurtosis).
-- **F-Test:** Beide Modelle formal signifikant (Hauptmodell F = 2,9, p = 0,002; Basismodell F = 4,3, p = 0,013), in beiden Fällen aber bei praktisch verschwindender Erklärungskraft (R² = 0,0011 bzw. 0,0004) nur ein formales Ergebnis ohne grosse praktische Bedeutung. Der Rückgang von R² = 0,192 (mit `Recommended IND`) auf R² = 0,0011 (ohne `Recommended IND`) zeigt deutlich, wie stark die entfernte post-treatment-Variable die vorherige Modellgüte getragen hat.
+- **Normalverteilung der Residuen:** Die Residuen weichen weiterhin deutlich von einer Normalverteilung ab. Die Skewness beträgt rund −2,43 und die Exzess Kurtosis rund 5,7, wobei Hauptmodell und Basismodell nahezu identische Werte aufweisen. Beide Kennzahlen liegen deutlich ausserhalb häufig verwendeter grober Orientierungswerte für geringe Abweichungen von der Normalverteilung. Die negative Skewness weist auf einen ausgeprägten linken Verteilungsschwanz hin, während die hohe positive Exzess Kurtosis auf eine leptokurtische Verteilung mit vergleichsweise schweren Verteilungsrändern hindeutet. Auch der Q-Q-Plot zeigt entsprechende systematische Abweichungen. Der Jarque Bera Test fällt erwartungsgemäss hochsignifikant aus. Angesichts der ausgeprägten Skewness und Exzess Kurtosis handelt es sich jedoch nicht lediglich um eine aufgrund der grossen Stichprobe statistisch nachweisbare minimale Abweichung.
 
-**Für Kapitel 4/5/6 als Limitation festhalten:** Die Residuen von H1 sind weiterhin nicht normalverteilt (deutliche Linksschiefe, Exzess-Kurtosis), was primär auf die Begrenzung von `VADER Compound` auf das Intervall [-1, 1] zurückzuführen ist. Die Punktschätzer (Koeffizienten) selbst bleiben unter OLS auch bei verletzter Normalverteilungsannahme unverzerrt, betroffen sind primär die Standardfehler und p-Werte, was bei N ≈ 22.627 dank Zentralem Grenzwertsatz weniger kritisch ist als bei kleinen Stichproben, aber als methodische Einschränkung transparent benannt werden sollte. Die im ursprünglichen Hauptmodell mit `Recommended IND` beobachtete Heteroskedastizität ist mit der Entfernung dieser post-treatment-Variable nicht mehr vorhanden, eine HC3-Korrektur ist für das aktuelle Hauptmodell nicht erforderlich.
+    Die Form der Residuenverteilung ist zudem mit der stark asymmetrischen und auf das Intervall [−1, 1] begrenzten abhängigen Variable `VADER Compound` vereinbar. Insbesondere die Konzentration vieler Beobachtungen im stark positiven Bereich bei gleichzeitig vorhandenen negativen Beobachtungen kann zur beobachteten asymmetrischen Residuenstruktur beitragen. Die Nichtnormalität der Residuen lässt sich daraus jedoch nicht eindeutig kausal ableiten.
+
+- **Gesamtsignifikanz und Erklärungskraft:** Beide Modelle sind gemäss F Test als Gesamtmodelle statistisch signifikant (Hauptmodell: F = 2,9, p = 0,002; Basismodell: F = 4,3, p = 0,013). Ihre praktische Erklärungskraft ist jedoch sehr gering. R² beträgt im Hauptmodell lediglich 0,0011 und im Basismodell 0,0004. Der Rückgang von R² = 0,192 im Modell mit `Recommended IND` auf R² = 0,0011 im aktuellen Hauptmodell zeigt, dass die Aufnahme von `Recommended IND` mit einem erheblichen Anstieg der erklärten Varianz verbunden war. Da diese Variable als potenzielle Post Treatment Variable nicht Bestandteil des Hauptmodells sein soll, ist die wesentlich geringere Erklärungskraft des aktuellen Modells bei der Interpretation der Ergebnisse zu berücksichtigen.
+
+**Limitation für Kapitel 4, 5 und 6:** Als zentrale diagnostische Einschränkung von H1 sollte die deutliche Nichtnormalität der Residuen transparent ausgewiesen werden. Bei ansonsten erfüllten OLS Voraussetzungen führt die Nichtnormalität der Fehler nicht automatisch zu verzerrten OLS Koeffizienten. Sie kann jedoch die exakte Inferenz über Standardfehler, Konfidenzintervalle und Signifikanztests beeinflussen. Aufgrund der sehr grossen Stichprobe von N ≈ 22'627 ist die asymptotische Inferenz grundsätzlich weniger empfindlich gegenüber Abweichungen von der Normalverteilung als bei kleinen Stichproben. Die ausgeprägte Linksschiefe und hohe Exzess Kurtosis sollten dennoch als methodische Einschränkung berücksichtigt werden. Für das aktuelle Hauptmodell ergeben sich dagegen keine statistisch signifikanten Hinweise auf Heteroskedastizität. Nach der festgelegten Entscheidungsregel wird deshalb keine HC3 Korrektur vorgenommen.
 
 
 ---
 
 # H2: Rating ~ Age + Age² (Ordinal Logistic Regression)
 
-**H2**: `Rating` (1–5, geordnet) als abhängige Variable, proportional-odds-Modell
-(`OrderedModel`, `distr="logit"`, `method="bfgs"`), inkl. Test der Proportional-Odds-Annahme.
+**H2**: `Rating` (1 bis 5, geordnet) als abhängige Variable, im Proportional Odds Modell (`OrderedModel`, `distr="logit"`, `method="bfgs"`), einschliesslich einer Prüfung der Proportional Odds Annahme.
 
 1. **Basismodell**: `Age_c` + `Age_c²`
-2. **Hauptmodell**: zusätzlich `Division Name`, `Department Name` (Dummies) – *ohne*
-   `Recommended IND` und *ohne* `Positive Feedback Count`
-3. **Robustheitsmodell A**: Hauptmodell + `Recommended IND` (Tautologie-Risiko, siehe unten)
-4. **Robustheitsmodell B**: Hauptmodell + `Positive Feedback Count` (bad control, siehe unten)
+2. **Hauptmodell**: zusätzlich `Division Name` und `Department Name` als Dummy Variablen, *ohne* `Recommended IND` und *ohne* `Positive Feedback Count`
+3. **Robustheitsmodell A**: Hauptmodell + `Recommended IND` als potenzielle Post Treatment Variable (Begründung siehe unten)
+4. **Robustheitsmodell B**: Hauptmodell + `Positive Feedback Count` als potenzielle Post Treatment Variable (Begründung siehe unten)
 
 
 ```python
@@ -1569,6 +1880,8 @@ THRESHOLDS = RATING_CATEGORIES[:-1]  # Rating > 1, > 2, > 3, > 4
 ```
 
 ## Daten vorbereiten
+
+Der Datensatz wird auf `Rating` sowie die Alters- und Kontrollvariablen reduziert. `Rating` wird dabei explizit als geordnete kategoriale Variable (`pd.Categorical`, `ordered=True`) kodiert, sodass die natürliche Reihenfolge der Bewertungskategorien für die ordinale logistische Regression berücksichtigt wird.
 
 
 ```python
@@ -1589,6 +1902,8 @@ X_basis.shape
 
 ## Basismodell: Rating ~ Age + Age²
 
+Analog zu H1 wird zunächst ein Basismodell mit Alter und quadriertem Alter als Prädiktoren geschätzt. Neben der zentrierten Modellspezifikation (`Age_c`, `Age_c_sq`) wird zusätzlich eine unzentrierte Variante (`Age`, `Age_sq`) geschätzt, um die Modellgüte und die numerische Konditionierung beider Spezifikationen anschliessend zu vergleichen.
+
 
 ```python
 ordinal_basis_raw = OrderedModel(y_basis, X_basis_raw, distr="logit")
@@ -1604,8 +1919,8 @@ print(res_basis.summary())
     Dep. Variable:                      y   Log-Likelihood:                -27640.
     Model:                   OrderedModel   AIC:                         5.529e+04
     Method:            Maximum Likelihood   BIC:                         5.534e+04
-    Date:                Sun, 30 Aug 2026                                         
-    Time:                        12:53:08                                         
+    Date:                Wed, 09 Sep 2026                                         
+    Time:                        13:09:03                                         
     No. Observations:               22640                                         
     Df Residuals:                   22634                                         
     Df Model:                           2                                         
@@ -1624,7 +1939,7 @@ print(res_basis.summary())
 
 ```python
 tp_basis = turning_point(res_basis.params["Age_c"], res_basis.params["Age_c_sq"])
-print(f"Wendepunkt (Basismodell): {tp_basis:.2f} Jahre")
+print(f"Geschätztes Minimum (Basismodell): {tp_basis:.2f} Jahre")
 print(f"McFadden Pseudo-R2: {res_basis.prsquared:.4f}  (Log-L: {res_basis.llf:.1f}, Log-L Null: {res_basis.llnull:.1f})")
 print(f"AIC: {res_basis.aic:.1f}")
 print(f"Cond. No. roh: {cond_number(X_basis_raw):.1f}  |  zentriert: {cond_number(X_basis):.1f}")
@@ -1632,18 +1947,18 @@ print(f"max|Δ Pseudo-R2, ΔAIC| roh vs. zentriert: "
       f"{max(abs(res_basis_raw.prsquared - res_basis.prsquared), abs(res_basis_raw.aic - res_basis.aic)):.2e}")
 ```
 
-    Wendepunkt (Basismodell): 37.39 Jahre
+    Geschätztes Minimum (Basismodell): 37.39 Jahre
     McFadden Pseudo-R2: 0.0010  (Log-L: -27640.1, Log-L Null: -27667.6)
     AIC: 55292.2
     Cond. No. roh: 209.0  |  zentriert: 21.9
     max|Δ Pseudo-R2, ΔAIC| roh vs. zentriert: 7.27e-09
 
 
-Sowohl `age_c` als auch `age_c_sq` sind bereits im Basismodell hochsignifikant (p < 0.001), der Wendepunkt liegt bei rund 37 Jahren. Die minimale Differenz zwischen roher und zentrierter Variante (7.27e-09) bestätigt erneut, dass die Zentrierung die Modellgüte nicht verändert; die geringfügige Abweichung von exakt null erklärt sich durch die iterative numerische Optimierung von `OrderedModel` (im Gegensatz zur exakten OLS-Lösung bei H1).
+Sowohl `age_c` als auch `age_c_sq` sind bereits im Basismodell hochsignifikant (p < 0,001). Das aus den geschätzten Koeffizienten berechnete Minimum des quadratischen Alterseffekts liegt bei rund 37 Jahren. Die äusserst geringe Differenz zwischen der Modellgüte der unzentrierten und der zentrierten Variante von 7.27e-09 bestätigt erneut, dass die Zentrierung die Modellgüte praktisch nicht verändert. Die geringfügige numerische Abweichung von exakt null ist mit der iterativen numerischen Optimierung des `OrderedModel` vereinbar, während die OLS Modelle in H1 über eine geschlossene beziehungsweise numerisch direkte Least Squares Lösung geschätzt werden.
 
 ## Hauptmodell: + Division Name, Department Name
 
-**Hinweis zur Datenvorbereitung fürs Hauptmodel**: Die Dummy-Kodierung erfolgt hier manuell über `pd.get_dummies(..., drop_first=True)`, da `OrderedModel` (anders als die Formel-Syntax bei H1) keine automatische kategoriale Kodierung unterstützt. Als Referenzkategorie wird jeweils die alphabetisch erste Ausprägung ausgeschlossen: bei `Division Name` ist dies 'General', bei `Department Name` 'Bottoms'. Alle übrigen Kategorien werden relativ zu dieser Referenz interpretiert.
+**Hinweis zur Datenvorbereitung für das Hauptmodell:** Die Dummy Kodierung erfolgt manuell mit `pd.get_dummies(..., drop_first=True)`, da `OrderedModel` im Gegensatz zur in H1 verwendeten Formel Syntax keine automatische Kodierung der kategorialen Variablen übernimmt. Als Referenzkategorie wird jeweils die erste Kategorie ausgeschlossen. Für `Division Name` ist dies `General` und für `Department Name` `Bottoms`. Die Koeffizienten der übrigen Kategorien werden jeweils relativ zur entsprechenden Referenzkategorie interpretiert.
 
 
 ```python
@@ -1670,7 +1985,7 @@ X_haupt.shape
 
 
 
-22640 - 13 = 22627 / 2 Age Variablen + Division/Department Dummies = 9
+Von den ursprünglich 22'640 Beobachtungen werden 13 aufgrund fehlender Werte bei `Division Name` und `Department Name` ausgeschlossen, sodass für das Hauptmodell 22'627 Beobachtungen verbleiben. Die Designmatrix umfasst insgesamt 9 Prädiktorvariablen und setzt sich aus den beiden Altersvariablen `Age_c` und `Age_c_sq` sowie den Dummy Variablen für `Division Name` und `Department Name` zusammen.
 
 
 ```python
@@ -1697,8 +2012,8 @@ print(res_haupt.summary())
     Dep. Variable:                      y   Log-Likelihood:                -27589.
     Model:                   OrderedModel   AIC:                         5.520e+04
     Method:            Maximum Likelihood   BIC:                         5.531e+04
-    Date:                Sun, 30 Aug 2026                                         
-    Time:                        12:53:12                                         
+    Date:                Wed, 09 Sep 2026                                         
+    Time:                        13:09:07                                         
     No. Observations:               22627                                         
     Df Residuals:                   22614                                         
     Df Model:                           9                                         
@@ -1721,12 +2036,12 @@ print(res_haupt.summary())
     ===========================================================================================
 
 
-Anders als bei H1 (nur `Department Name = Trend` signifikant) zeigen bei H2 mehrere Department-Kategorien (`Dresses`, `Tops`, `Trend`) einen statistisch signifikanten Zusammenhang mit dem Rating. 
+Anders als bei H1, bei der lediglich die Kategorie Department Name = Trend statistisch signifikant war, zeigen sich bei H2 für mehrere Department Kategorien (Dresses, Tops und Trend) statistisch signifikante Zusammenhänge mit dem Rating. Die jeweiligen Koeffizienten sind dabei relativ zur Referenzkategorie Bottoms zu interpretieren.
 
 
 ```python
 tp_haupt = turning_point(res_haupt.params["Age_c"], res_haupt.params["Age_c_sq"])
-print(f"Wendepunkt (Hauptmodell): {tp_haupt:.2f} Jahre")
+print(f"Geschätztes Minimum (Hauptmodell): {tp_haupt:.2f} Jahre")
 print(f"McFadden Pseudo-R2: {res_haupt.prsquared:.4f}  (Log-L: {res_haupt.llf:.1f}, Log-L Null: {res_haupt.llnull:.1f})")
 print(f"AIC: {res_haupt.aic:.1f}")
 print(f"Cond. No. roh: {cond_number(X_haupt_raw):.1f}  |  zentriert: {cond_number(X_haupt):.1f}")
@@ -1734,19 +2049,18 @@ print(f"max|Δ Pseudo-R2, ΔAIC| roh vs. zentriert: "
       f"{max(abs(res_haupt_raw.prsquared - res_haupt.prsquared), abs(res_haupt_raw.aic - res_haupt.aic)):.2e}")
 ```
 
-    Wendepunkt (Hauptmodell): 37.23 Jahre
+    Geschätztes Minimum (Hauptmodell): 37.23 Jahre
     McFadden Pseudo-R2: 0.0026  (Log-L: -27589.4, Log-L Null: -27660.0)
     AIC: 55204.8
     Cond. No. roh: 34499.3  |  zentriert: 3789.7
     max|Δ Pseudo-R2, ΔAIC| roh vs. zentriert: 5.93e-07
 
 
-Der Wendepunkt liegt mit 37,23 Jahren nahe am Basismodell (37,39 Jahre), was auf einen stabilen, nicht-linearen Alterseffekt hindeutet, der weitgehend unabhängig von den Kontrollvariablen ist.
+Das geschätzte Minimum liegt mit 37,23 Jahren sehr nahe am Minimum des Basismodells von 37,39 Jahren. Dies spricht für einen stabilen nicht linearen Alterseffekt, dessen geschätztes Minimum sich durch die Aufnahme der Kontrollvariablen `Division Name` und `Department Name` nur geringfügig verändert.
 
 ## Robustheitsmodell A: Hauptmodell + Recommended IND
 
-**Tautologie-Risiko:** `Recommended IND` ist im Datensatz de facto eine binarisierte Fassung derselben Bewertungshaltung, die auch im `Rating` zum Ausdruck kommt. Als Prädiktor der
-abhängigen Variable `Rating` besteht daher die Gefahr einer Tautologie bzw. einer Verzerrung durch Kollinearität mit der abhängigen Variable selbst. `Recommended IND` bleibt deshalb ausserhalb des Hauptmodells und wird nur zur Robustheitsprüfung ergänzt.
+Potenzielle Post Treatment Variable: `Recommended IND` bildet eine Weiterempfehlungsentscheidung ab, die inhaltlich eng mit der durch `Rating` erfassten Produktbewertung verbunden ist. Die Entscheidung, ein Produkt weiterzuempfehlen, kann als Konsequenz derselben Bewertung beziehungsweise als der Bewertung nachgelagerte Variable betrachtet werden. Die Aufnahme von `Recommended IND` als Prädiktor könnte daher einen Teil des interessierenden Zusammenhangs statistisch kontrollieren und die Interpretation des Alterseffekts erschweren. `Recommended IND` wird deshalb nicht in das Hauptmodell aufgenommen, sondern ausschliesslich in einem separaten Robustheitsmodell berücksichtigt.
 
 
 ```python
@@ -1768,8 +2082,8 @@ print(res_robust_a.summary())
     Dep. Variable:                      y   Log-Likelihood:                -20168.
     Model:                   OrderedModel   AIC:                         4.036e+04
     Method:            Maximum Likelihood   BIC:                         4.048e+04
-    Date:                Sun, 30 Aug 2026                                         
-    Time:                        12:53:17                                         
+    Date:                Wed, 09 Sep 2026                                         
+    Time:                        13:09:11                                         
     No. Observations:               22627                                         
     Df Residuals:                   22613                                         
     Df Model:                          10                                         
@@ -1793,25 +2107,25 @@ print(res_robust_a.summary())
     ===========================================================================================
 
 
-Das Tautologie-Risiko wird hier deutlich sichtbar: Der Koeffizient von `Recommended IND` ist extrem hoch (5,5428) mit einer entsprechend grossen z-Statistik (82,064), während alle anderen Koeffizienten im Modell im Bereich von −0,5 bis +0,1 liegen.
+Die enge statistische Beziehung zwischen `Recommended IND` und `Rating` wird im Robustheitsmodell deutlich sichtbar. `Recommended IND` weist einen sehr grossen positiven Koeffizienten von 5,5428 und eine entsprechend hohe z Statistik von 82,064 auf. Dies spricht für einen ausserordentlich starken Zusammenhang zwischen der Weiterempfehlungsentscheidung und der Höhe des Ratings und unterstreicht die enge inhaltliche Nähe beider Bewertungsgrössen. Die Grössenordnung der Koeffizienten sollte dabei nicht unmittelbar mit jener der übrigen Prädiktoren verglichen werden, da deren Skalierung und Kodierung unterschiedlich sind.
 
-Noch deutlicher zeigt sich das Problem bei den Age-Koeffizienten: Im Hauptmodell ohne `Recommended IND` war `age_c` hochsignifikant (p < 0,001). Sobald `Recommended IND` im Modell enthalten ist, wird `age_c` vollständig insignifikant (p = 0,903). Das entspricht genau dem methodisch erwarteten Problem: `Recommended IND` bindet nahezu dieselbe Information wie `Rating` selbst und verdrängt dabei den eigentlich interessierenden Alterseffekt aus dem Modell.
+Besonders deutlich zeigt sich der Einfluss von `Recommended IND` bei den Alterskoeffizienten. Im Hauptmodell ohne `Recommended IND` ist `age_c` hochsignifikant (p < 0,001). Nach Aufnahme von `Recommended IND` ist der lineare Altersterm dagegen nicht mehr statistisch signifikant (p = 0,903). Dies zeigt, dass die Schätzung des linearen Alterseffekts stark von der Berücksichtigung von `Recommended IND` abhängt. Das Ergebnis ist mit der methodischen Vermutung vereinbar, dass `Recommended IND` aufgrund seiner engen inhaltlichen und statistischen Beziehung zu `Rating` einen erheblichen Teil der für die Bewertung relevanten Variation erfasst. Dadurch verändert sich die Schätzung des interessierenden Alterseffekts deutlich, was die Entscheidung unterstützt, `Recommended IND` nicht in das Hauptmodell aufzunehmen.
 
-Die Thresholds habe sich, im Vergleich zum Hauptmodell, massiv verschoben (zum Beispiel 3/4 von vorher etwa -0.06 auf jetzt +1.0036). Das zeigt, wie stark `Recommended IND` die gesamte Modellstruktur verändert.
+Im Vergleich zum Hauptmodell verändern sich auch die geschätzten Threshold Parameter deutlich. So verschiebt sich beispielsweise der Threshold `3/4` von etwa −0,06 im Hauptmodell auf 1,0036 im Robustheitsmodell mit `Recommended IND`. Dies zeigt, dass die Aufnahme von `Recommended IND` nicht nur mit Veränderungen einzelner Regressionskoeffizienten, sondern auch mit einer deutlichen Veränderung der geschätzten Schwellenparameter des ordinalen Modells einhergeht.
 
-**Zusammengefasst:** Die Ergebnisse bestätigen das eingangs vermutete Tautologie-Risiko deutlich:
-`Recommended IND` weist einen extrem hohen Koeffizienten auf (5.54, z = 82.06), McFadden Pseudo-R² springt von 0.0026 auf 0.2708 (siehe weiter unten), und `age_c` verliert dabei seine Signifikanz vollständig (p = 0.903 statt zuvor p < 0.001). Dies bestätigt, dass `Recommended IND` zu stark mit dem Rating selbst verknüpft ist, um als sinnvolle unabhängige Kontrollvariable zu dienen, und untermauert die Entscheidung, es aus dem Hauptmodell auszuschliessen.
+**Zusammengefasst:** Die Ergebnisse verdeutlichen die enge statistische Beziehung zwischen `Recommended IND` und `Rating`. `Recommended IND` weist einen sehr grossen positiven Koeffizienten auf (5,54, z = 82,06), während das McFadden Pseudo R² von 0,0026 im Hauptmodell auf 0,2708 im Robustheitsmodell ansteigt (siehe weiter unten). Gleichzeitig verliert `age_c` nach Aufnahme von `Recommended IND` seine statistische Signifikanz vollständig (p = 0,903 gegenüber p < 0,001 im Hauptmodell). Diese deutlichen Veränderungen zeigen, dass die Modellergebnisse stark von der Berücksichtigung von `Recommended IND` abhängen und sind mit der vermuteten engen inhaltlichen und statistischen Beziehung zwischen Weiterempfehlungsentscheidung und Rating vereinbar. Dies unterstützt die Entscheidung, `Recommended IND` nicht als Kontrollvariable in das Hauptmodell aufzunehmen, sondern ausschliesslich im Rahmen der Robustheitsanalyse zu berücksichtigen.
+
 
 
 ```python
 tp_robust_a = turning_point(res_robust_a.params["Age_c"], res_robust_a.params["Age_c_sq"])
-print(f"Wendepunkt (Robustheitsmodell A): {tp_robust_a:.2f} Jahre")
+print(f"Geschätztes Minimum (Robustheitsmodell A): {tp_robust_a:.2f} Jahre")
 print(f"McFadden Pseudo-R2: {res_robust_a.prsquared:.4f}")
 print(f"AIC: {res_robust_a.aic:.1f}")
 print(f"Cond. No. roh: {cond_number(X_robust_a_raw):.1f}  |  zentriert: {cond_number(X_robust_a):.1f}")
 ```
 
-    Wendepunkt (Robustheitsmodell A): 43.56 Jahre
+    Geschätztes Minimum (Robustheitsmodell A): 43.56 Jahre
     McFadden Pseudo-R2: 0.2708
     AIC: 40364.9
     Cond. No. roh: 34499.7  |  zentriert: 3793.6
@@ -1819,9 +2133,7 @@ print(f"Cond. No. roh: {cond_number(X_robust_a_raw):.1f}  |  zentriert: {cond_nu
 
 ## Robustheitsmodell B: Hauptmodell + Positive Feedback Count
 
-Gleiche **"bad control"-Problematik** wie bei H1 (Angrist & Pischke, 2009): `Positive Feedback
-Count` entsteht zeitlich nach der Review und kann selbst durch das Rating/den Reviewinhalt
-beeinflusst sein. Auch hier daher nur als Robustheitsprüfung, nicht im Hauptmodell.
+**Potenzielle Post Treatment Variable:** `Positive Feedback Count` wird zeitlich nach der Veröffentlichung der Review erfasst und kann selbst durch das `Rating` beziehungsweise den Inhalt der Review beeinflusst werden. Die Variable könnte somit dem interessierenden Bewertungsprozess kausal nachgelagert sein. Sie wird daher nicht als Kontrollvariable in das Hauptmodell aufgenommen, sondern ausschliesslich im Rahmen einer separaten Robustheitsanalyse berücksichtigt.
 
 
 ```python
@@ -1843,8 +2155,8 @@ print(res_robust_b.summary())
     Dep. Variable:                      y   Log-Likelihood:                -27558.
     Model:                   OrderedModel   AIC:                         5.514e+04
     Method:            Maximum Likelihood   BIC:                         5.526e+04
-    Date:                Sun, 30 Aug 2026                                         
-    Time:                        12:53:20                                         
+    Date:                Wed, 09 Sep 2026                                         
+    Time:                        13:09:14                                         
     No. Observations:               22627                                         
     Df Residuals:                   22613                                         
     Df Model:                          10                                         
@@ -1871,19 +2183,19 @@ print(res_robust_b.summary())
 
 ```python
 tp_robust_b = turning_point(res_robust_b.params["Age_c"], res_robust_b.params["Age_c_sq"])
-print(f"Wendepunkt (Robustheitsmodell B): {tp_robust_b:.2f} Jahre")
+print(f"Geschätztes Minimum (Robustheitsmodell B): {tp_robust_b:.2f} Jahre")
 print(f"McFadden Pseudo-R2: {res_robust_b.prsquared:.4f}")
 print(f"AIC: {res_robust_b.aic:.1f}")
 print(f"Cond. No. roh: {cond_number(X_robust_b_raw):.1f}  |  zentriert: {cond_number(X_robust_b):.1f}")
 ```
 
-    Wendepunkt (Robustheitsmodell B): 36.36 Jahre
+    Geschätztes Minimum (Robustheitsmodell B): 36.36 Jahre
     McFadden Pseudo-R2: 0.0037
     AIC: 55143.6
     Cond. No. roh: 34501.3  |  zentriert: 3790.5
 
 
-Anders als bei Robustheitsmodell A bleibt der Alterseffekt hier stabil: `age_c`und `age_c_sq` bleiben hochsignifikant. Der Wendepunkt liegt mit 36.36 Jahren weiterhin nahe an den übrigen Modellen. `Positive Feedback Count` selbst ist zwar signifikant (Koeffizient -0.0172, p < 0.001), verändert die Modellgüte aber nur geringfügig (McFadden Pseudo-R² steigt von 0.0026 auf lediglich 0.0037). Damit zeigt sich, dass diese Variable, obwohl ebenfalls eine Post-treatment-Grösse, ein deutlich geringeres Verzerrungsrisiko birgt als `Recommended IND`, was den grundsätzlichen Ausschluss beider Variablen aus dem Hauptmodell zusätzlich rechtfertigt.
+Anders als im Robustheitsmodell A bleibt der geschätzte Alterseffekt nach Aufnahme von `Positive Feedback Count` weitgehend stabil: Sowohl `age_c` als auch `age_c_sq` bleiben hochsignifikant. Das geschätzte Minimum liegt mit 36,36 Jahren weiterhin nahe an den Schätzungen der übrigen Modelle. `Positive Feedback Count` selbst weist einen statistisch signifikanten negativen Zusammenhang mit dem `Rating` auf (Koeffizient = −0,0172, p < 0,001), während sich die Modellgüte nur geringfügig erhöht. Das McFadden Pseudo R² steigt von 0,0026 im Hauptmodell auf 0,0037. Im Gegensatz zu `Recommended IND` verändert die Aufnahme von `Positive Feedback Count` die zentralen Ergebnisse zum Alterseffekt somit nur geringfügig. Dies spricht für die Robustheit des Alterseffekts gegenüber der zusätzlichen Berücksichtigung dieser Variable. Der Ausschluss von `Positive Feedback Count` aus dem Hauptmodell bleibt unabhängig davon aufgrund ihrer potenziellen Stellung als Post Treatment Variable methodisch begründet.
 
 ## Condition Number vorher/nachher: Übersicht aller H2-Modelle
 
@@ -2004,7 +2316,7 @@ h2_cond_check
 
 
 
-Wie bereits beim Basis- und Hauptmodell zeigt sich auch bei beiden Robustheitsmodellen: die Zentrierung senkt die Condition Number deutlich, während Pseudo-R² und AIC in allen vier Modellen zwischen roher und zentrierter Variante praktisch identisch bleiben (max. Abweichung im Bereich von 10⁻⁷ bis 10⁻⁹).
+Wie bereits beim Basis- und Hauptmodell zeigt sich auch bei den beiden Robustheitsmodellen, dass die Zentrierung die Condition Number deutlich reduziert, während das McFadden Pseudo R² und der AIC zwischen der unzentrierten und der zentrierten Variante praktisch unverändert bleiben. Die maximalen Abweichungen liegen lediglich in einer Grössenordnung von 1e-7 bis 1e-9 und sind auf numerische Unterschiede bei der iterativen Modellschätzung zurückzuführen. Die Zentrierung verbessert somit die numerische Konditionierung der Modelle, ohne deren Modellgüte substanziell zu verändern.
 
 ## Modellvergleich Basismodell / Hauptmodell / Robustheitsmodelle
 
@@ -2015,7 +2327,7 @@ h2_fit_stats = pd.DataFrame({
     "Hauptmodell": [res_haupt.nobs, res_haupt.llf, res_haupt.llnull, res_haupt.prsquared, res_haupt.aic, tp_haupt],
     "Robustheitsmodell A (+ Recommended IND)": [res_robust_a.nobs, res_robust_a.llf, res_robust_a.llnull, res_robust_a.prsquared, res_robust_a.aic, tp_robust_a],
     "Robustheitsmodell B (+ Positive Feedback Count)": [res_robust_b.nobs, res_robust_b.llf, res_robust_b.llnull, res_robust_b.prsquared, res_robust_b.aic, tp_robust_b],
-}, index=["N", "Log-Likelihood", "Log-Likelihood (Null)", "McFadden Pseudo-R2", "AIC", "Wendepunkt (Age)"])
+}, index=["N", "Log-Likelihood", "Log-Likelihood (Null)", "McFadden Pseudo-R2", "AIC", "Geschätztes Minimum (Age)"])
 h2_fit_stats
 ```
 
@@ -2083,7 +2395,7 @@ h2_fit_stats
       <td>55143.557399</td>
     </tr>
     <tr>
-      <th>Wendepunkt (Age)</th>
+      <th>Geschätztes Minimum (Age)</th>
       <td>37.388697</td>
       <td>37.227537</td>
       <td>43.558152</td>
@@ -2095,19 +2407,334 @@ h2_fit_stats
 
 
 
-Die Gesamtübersicht macht die Sondersituation von Robustheitsmodell A deutlich sichtbar: während Basismodell, Hauptmodell und Robustheitsmodell B konsistente Wendepunkte im Bereich von 36 bis 37 Jahren zeigen, verschiebt sich dieser bei Aufnahme von `Recommended IND` auf 43.56 Jahre, begleitet von einem stark abweichenden Pseudo-R² und AIC. Dies unterstreicht nochmals, dass`Recommended IND` als Kontrollvariable die Modellstruktur grundlegend verändert und daher zu Recht ausserhalb des Hauptmodells geführt wird. Die drei übrigen Modelle bestätigen einen stabilen, nicht-linearen Alterseffekt.
+Die Gesamtübersicht verdeutlicht die Sonderstellung von Robustheitsmodell A. Während Basismodell, Hauptmodell und Robustheitsmodell B konsistente geschätzte Minima im Bereich von 36 bis 37 Jahren aufweisen, verschiebt sich das Minimum nach Aufnahme von `Recommended IND` auf 43,56 Jahre. Gleichzeitig zeigen sich deutliche Veränderungen beim McFadden Pseudo R² und beim AIC. Dies unterstreicht, dass die Aufnahme von `Recommended IND` mit erheblichen Veränderungen der Modellstruktur und der geschätzten Alterseffekte einhergeht und unterstützt die Entscheidung, diese Variable nicht in das Hauptmodell aufzunehmen. Die weitgehend übereinstimmenden Ergebnisse der drei übrigen Modelle sprechen dagegen für eine stabile Schätzung des nicht linearen Alterseffekts.
+
+## Visualisierung: Alterseffekt auf Rating (H2)
+
+Analog zu H1 wird der im H2 Hauptmodell (`OrderedModel`) geschätzte Alterseffekt grafisch dargestellt. Gezeigt werden die beobachteten mittleren `Rating` Werte je 5 Jahres Altersgruppe mit 95 % Konfidenzintervallen auf Basis der t Verteilung sowie die aus dem Hauptmodell vorhergesagte Erwartungswertkurve. Der erwartete `Rating` Wert wird dabei aus den vorhergesagten Wahrscheinlichkeiten der fünf Rating Kategorien als E[`Rating`] = Σ k · P(`Rating` = k) berechnet. Die Modellvorhersagen werden für dieselben Referenzkategorien wie bei H1 ausgewertet (`Division Name` = `General`, `Department Name` = `Bottoms`), sodass sämtliche zugehörigen Dummy Variablen den Wert null annehmen.
+
+
+```python
+from scipy.stats import t as t_dist
+
+# Dieselben 5-Jahres-Altersgruppen wie bei H1
+h2_age_bin_edges = list(range(18, 99, 5)) + [100]
+h2_age_bin_labels = [f"{h2_age_bin_edges[i]}-{h2_age_bin_edges[i + 1] - 1}" for i in range(len(h2_age_bin_edges) - 1)]
+h2_age_groups = pd.cut(df["Age"], bins=h2_age_bin_edges, right=False, labels=h2_age_bin_labels)
+
+h2_group_stats = df.groupby(h2_age_groups, observed=True)["Rating"].agg(["mean", "std", "size"]).reset_index()
+h2_group_stats.columns = ["Altersgruppe", "rating_mean", "rating_std", "n"]
+h2_group_stats["age_mean_obs"] = df.groupby(h2_age_groups, observed=True)["Age"].mean().values
+h2_group_stats["sem"] = h2_group_stats["rating_std"] / np.sqrt(h2_group_stats["n"])
+h2_group_stats["ci95"] = h2_group_stats["sem"] * t_dist.ppf(0.975, h2_group_stats["n"] - 1)
+
+# CI-Grenzen auf den gültigen Wertebereich von Rating [1, 5] clippen (nur die Fehlerbalken,
+# nicht der Punktschätzer selbst, der ohnehin stets im gültigen Bereich liegt). Bei kleinen
+# Altersgruppen (v.a. am oberen Altersrand) reicht das unclippte CI sonst ausserhalb dieses Bereichs.
+h2_group_stats["ci_lower"] = (h2_group_stats["rating_mean"] - h2_group_stats["ci95"]).clip(lower=1.0, upper=5.0)
+h2_group_stats["ci_upper"] = (h2_group_stats["rating_mean"] + h2_group_stats["ci95"]).clip(lower=1.0, upper=5.0)
+h2_yerr = np.vstack([
+    h2_group_stats["rating_mean"] - h2_group_stats["ci_lower"],
+    h2_group_stats["ci_upper"] - h2_group_stats["rating_mean"],
+])
+
+# Erwartete Rating-Kurve des H2-Hauptmodells an der Referenzkategorie (alle Dummy-Spalten = 0):
+# E[Rating] = sum_k k * P(Rating = k)
+h2_age_grid = np.linspace(df["Age"].min(), df["Age"].max(), 300)
+h2_newX = pd.DataFrame(0.0, index=range(len(h2_age_grid)), columns=X_haupt.columns)
+h2_newX["Age_c"] = h2_age_grid - age_mean
+h2_newX["Age_c_sq"] = (h2_age_grid - age_mean) ** 2
+h2_pred_probs = np.asarray(res_haupt.predict(h2_newX))
+h2_expected_rating = h2_pred_probs @ np.array(RATING_CATEGORIES)
+
+fig, ax = plt.subplots(figsize=(8, 5))
+ax.errorbar(
+    h2_group_stats["age_mean_obs"], h2_group_stats["rating_mean"], yerr=h2_yerr,
+    fmt="o", color="#DD8452", ecolor="#DD8452", elinewidth=1.2, capsize=3, markersize=5,
+    label="Beobachteter Mittelwert je Altersgruppe (95%-CI, auf [1, 5] geclippt)",
+)
+ax.plot(h2_age_grid, h2_expected_rating, color="#DD8452", linewidth=2,
+        label="Gefittetes Hauptmodell, E[Rating] (Referenzkategorie)")
+ax.axvline(tp_haupt, color="#DD8452", linestyle="--", linewidth=1.2,
+           label=f"Geschätztes Minimum \u2248 {tp_haupt:.1f} Jahre")
+ax.set_xlabel("Alter (Jahre)")
+ax.set_ylabel("Rating (Sterne)")
+ax.set_title("Rating nach Alter: Beobachtete Mittelwerte und gefittetes Hauptmodell (H2)")
+ax.legend(fontsize=8)
+fig.tight_layout()
+fig.savefig(FIGURES_DIR / "h2_age_fitted_curve.png", dpi=150)
+plt.show()
+
+print(f"Geschätztes Minimum H2-Hauptmodell (für Grafik verwendet): {tp_haupt:.2f} Jahre")
+h2_group_stats
+```
+
+
+    
+![png](04_Regression_export_files/04_Regression_export_103_0.png)
+    
+
+
+    Geschätztes Minimum H2-Hauptmodell (für Grafik verwendet): 37.23 Jahre
+
+
+
+
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>Altersgruppe</th>
+      <th>rating_mean</th>
+      <th>rating_std</th>
+      <th>n</th>
+      <th>age_mean_obs</th>
+      <th>sem</th>
+      <th>ci95</th>
+      <th>ci_lower</th>
+      <th>ci_upper</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>18-22</td>
+      <td>4.392765</td>
+      <td>0.974147</td>
+      <td>387</td>
+      <td>20.852713</td>
+      <td>0.049519</td>
+      <td>0.097360</td>
+      <td>4.295405</td>
+      <td>4.490125</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>23-27</td>
+      <td>4.231367</td>
+      <td>1.056878</td>
+      <td>1543</td>
+      <td>25.225535</td>
+      <td>0.026906</td>
+      <td>0.052775</td>
+      <td>4.178592</td>
+      <td>4.284143</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>28-32</td>
+      <td>4.100657</td>
+      <td>1.163272</td>
+      <td>2434</td>
+      <td>30.173377</td>
+      <td>0.023579</td>
+      <td>0.046237</td>
+      <td>4.054421</td>
+      <td>4.146894</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>33-37</td>
+      <td>4.132969</td>
+      <td>1.144783</td>
+      <td>3843</td>
+      <td>35.023159</td>
+      <td>0.018467</td>
+      <td>0.036205</td>
+      <td>4.096764</td>
+      <td>4.169174</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>38-42</td>
+      <td>4.189342</td>
+      <td>1.085419</td>
+      <td>3903</td>
+      <td>39.805022</td>
+      <td>0.017374</td>
+      <td>0.034063</td>
+      <td>4.155279</td>
+      <td>4.223404</td>
+    </tr>
+    <tr>
+      <th>5</th>
+      <td>43-47</td>
+      <td>4.110766</td>
+      <td>1.153620</td>
+      <td>2898</td>
+      <td>45.025880</td>
+      <td>0.021430</td>
+      <td>0.042019</td>
+      <td>4.068747</td>
+      <td>4.152785</td>
+    </tr>
+    <tr>
+      <th>6</th>
+      <td>48-52</td>
+      <td>4.183260</td>
+      <td>1.106446</td>
+      <td>2270</td>
+      <td>49.798678</td>
+      <td>0.023223</td>
+      <td>0.045540</td>
+      <td>4.137719</td>
+      <td>4.228800</td>
+    </tr>
+    <tr>
+      <th>7</th>
+      <td>53-57</td>
+      <td>4.216269</td>
+      <td>1.109936</td>
+      <td>2053</td>
+      <td>54.853385</td>
+      <td>0.024496</td>
+      <td>0.048041</td>
+      <td>4.168228</td>
+      <td>4.264309</td>
+    </tr>
+    <tr>
+      <th>8</th>
+      <td>58-62</td>
+      <td>4.326116</td>
+      <td>1.057203</td>
+      <td>1478</td>
+      <td>60.014885</td>
+      <td>0.027499</td>
+      <td>0.053942</td>
+      <td>4.272175</td>
+      <td>4.380058</td>
+    </tr>
+    <tr>
+      <th>9</th>
+      <td>63-67</td>
+      <td>4.271186</td>
+      <td>1.087083</td>
+      <td>1121</td>
+      <td>64.886708</td>
+      <td>0.032468</td>
+      <td>0.063706</td>
+      <td>4.207481</td>
+      <td>4.334892</td>
+    </tr>
+    <tr>
+      <th>10</th>
+      <td>68-72</td>
+      <td>4.256410</td>
+      <td>1.133388</td>
+      <td>429</td>
+      <td>69.433566</td>
+      <td>0.054720</td>
+      <td>0.107554</td>
+      <td>4.148856</td>
+      <td>4.363965</td>
+    </tr>
+    <tr>
+      <th>11</th>
+      <td>73-77</td>
+      <td>4.041958</td>
+      <td>1.243995</td>
+      <td>143</td>
+      <td>74.412587</td>
+      <td>0.104028</td>
+      <td>0.205644</td>
+      <td>3.836314</td>
+      <td>4.247602</td>
+    </tr>
+    <tr>
+      <th>12</th>
+      <td>78-82</td>
+      <td>4.534483</td>
+      <td>0.882888</td>
+      <td>58</td>
+      <td>79.758621</td>
+      <td>0.115929</td>
+      <td>0.232144</td>
+      <td>4.302339</td>
+      <td>4.766626</td>
+    </tr>
+    <tr>
+      <th>13</th>
+      <td>83-87</td>
+      <td>4.606557</td>
+      <td>0.970888</td>
+      <td>61</td>
+      <td>83.655738</td>
+      <td>0.124309</td>
+      <td>0.248656</td>
+      <td>4.357901</td>
+      <td>4.855213</td>
+    </tr>
+    <tr>
+      <th>14</th>
+      <td>88-92</td>
+      <td>4.000000</td>
+      <td>1.537412</td>
+      <td>12</td>
+      <td>90.083333</td>
+      <td>0.443813</td>
+      <td>0.976825</td>
+      <td>3.023175</td>
+      <td>4.976825</td>
+    </tr>
+    <tr>
+      <th>15</th>
+      <td>93-97</td>
+      <td>3.800000</td>
+      <td>1.643168</td>
+      <td>5</td>
+      <td>93.600000</td>
+      <td>0.734847</td>
+      <td>2.040262</td>
+      <td>1.759738</td>
+      <td>5.000000</td>
+    </tr>
+    <tr>
+      <th>16</th>
+      <td>98-99</td>
+      <td>4.500000</td>
+      <td>0.707107</td>
+      <td>2</td>
+      <td>99.000000</td>
+      <td>0.500000</td>
+      <td>6.353102</td>
+      <td>1.000000</td>
+      <td>5.000000</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+
+
+ Wie bereits bei H1 spiegelt die zunehmende Breite der Konfidenzintervalle in den höchsten Altersgruppen die dort sehr geringe Fallzahl wider. Die älteste Altersgruppe von 98 bis 99 Jahren umfasst lediglich 2 Beobachtungen, während für die Altersgruppe von 93 bis 97 Jahren nur 5 Beobachtungen vorliegen. Die Ergebnisse in diesen Altersbereichen sind daher mit entsprechend hoher Unsicherheit verbunden und sollten vorsichtig interpretiert werden.
 
 ## Proportional-Odds-Annahme testen (Brant 1990, Separate-Fits-Ansatz)
 
-Getestet wird für das **Basismodell** und das **Hauptmodell** (zentrierte Altersvariable; die Robustheitsmodelle dienen der Koeffizienten-Plausibilisierung und werden hier aus Aufwandsgründen nicht zusätzlich proportional-odds-getestet). Da die Zentrierung eine reine Reparametrisierung ist, sind Wald-/LR-Statistik unter zentrierter und roher Altersvariable identisch. Getestet wird daher direkt mit den zentrierten (finalen) Modellen.
+Die Proportional Odds Annahme wird für das Basismodell und das Hauptmodell mit zentrierter Altersvariable geprüft. Die beiden Robustheitsmodelle dienen der zusätzlichen Überprüfung der Stabilität der zentralen Modellergebnisse und werden aus Aufwandsgründen nicht separat auf die Proportional Odds Annahme getestet. Da die Zentrierung der Altersvariable eine reine Reparametrisierung darstellt, bleiben die entsprechenden Wald beziehungsweise LR Statistiken unter der zentrierten und der unzentrierten Spezifikation bis auf mögliche numerische Rundungsabweichungen unverändert. Die Prüfung erfolgt daher direkt anhand der zentrierten finalen Modelle.
 
-1. Für jede Schwelle `j` wird ein eigenes binäres Logit-Modell (`sm.Logit`) mit denselben Prädiktoren wie im jeweiligen `OrderedModel` geschätzt → Koeffizientenvektor `β_j` und dessen Kovarianzmatrix `V_jj = (X'W_jX)⁻¹`, mit `W_j = diag(π_j(1-π_j))`.
-2. Die Kovarianz zwischen zwei Schwellen-Modellen `j < l` ergibt sich nach Brants Formel als `V_jl = (X'W_jX)⁻¹ (X'W_jlX) (X'W_lX)⁻¹`, mit `W_jl = diag(π_l - π_j·π_l)`.
-3. Diese Blöcke ergeben die volle Kovarianzmatrix `V` des gestapelten Koeffizientenvektors `β = (β_1', …, β_{K-1}')'`.
-4. Eine Kontrastmatrix `D` bildet die Differenzen der Steigungskoeffizienten (ohne Konstanten) zwischen aufeinanderfolgenden Schwellen.
-5. Wald-Statistik: `X² = (Dβ)' [D·V·D']⁻¹ (Dβ)`, `df = (K-2)·p`, `p`-Wert über die Chi²-Verteilung – zusätzlich zum Omnibus-Test auch **pro Variable** (`df = K-2 = 3`).
+1. Für jede Schwelle `j` wird ein separates binäres Logit Modell (`sm.Logit`) mit denselben Prädiktoren wie im jeweiligen `OrderedModel` geschätzt. Daraus ergeben sich der    Koeffizientenvektor `β_j` und die zugehörige Kovarianzmatrix `V_jj = (X'W_jX)⁻¹`, wobei `W_j = diag(π_j(1 − π_j))` gilt.
+2. Die Kovarianz zwischen zwei Schwellenmodellen `j < l` wird nach Brants Formel als `V_jl = (X'W_jX)⁻¹ (X'W_jlX) (X'W_lX)⁻¹` berechnet, wobei `W_jl = diag(π_l − π_j · π_l)` gilt.
+3. Aus diesen Blöcken wird die vollständige Kovarianzmatrix `V` des gestapelten Koeffizientenvektors `β = (β_1', …, β_{K−1}')'` gebildet.
+4. Eine Kontrastmatrix `D` bildet die Differenzen der Steigungskoeffizienten ohne Konstanten zwischen aufeinanderfolgenden Schwellen ab.
+5. Die Wald Statistik wird als `χ² = (Dβ)' [D · V · D']⁻¹ (Dβ)` berechnet. Für den Omnibus Test ergeben sich `df = (K − 2) · p` Freiheitsgrade. Ergänzend wird die Proportional Odds Annahme für jede Prädiktorvariable separat mit jeweils `df = K − 2 = 3` Freiheitsgraden geprüft. Die zugehörigen p Werte werden anhand der Chi Quadrat Verteilung bestimmt.
 
-Zusätzlich zu den Einzelvariablen-Tests wird ein **gemeinsamer Blocktest für `Age_c` + `Age_c_sq`** berechnet (`groups=...`). Ein Test einer *einzelnen* Spalte ist nicht invariant gegenüber der Zentrierung (die Zentrierung mischt linearen und quadratischen Alters-Term neu); der gemeinsame Blocktest über beide Alters-Terme hingegen prüft die vom gewählten Koordinatensystem unabhängige Hypothese "Alterseffekt insgesamt über alle Schwellen konstant?" und liefert daher, anders als die einzelne `Age_c`-Zeile, ein zitierfähiges, robustes Ergebnis für Alter.
+
+Zusätzlich zu den Tests der einzelnen Prädiktorvariablen wird ein gemeinsamer Blocktest für `Age_c` und `Age_c_sq` berechnet (`groups=...`). Der Test eines einzelnen Altersterms ist nicht invariant gegenüber der Zentrierung, da sich durch die Zentrierung die Parametrisierung des linearen und quadratischen Altersterms verändert. Der gemeinsame Blocktest über beide Altersterme prüft dagegen die vom gewählten Koordinatensystem unabhängige Hypothese, ob der Alterseffekt insgesamt über alle Schwellen konstant ist. Im Gegensatz zum separaten Test von `age_c` liefert der gemeinsame Blocktest somit ein gegenüber der Zentrierung invariantes und für die Interpretation des Alterseffekts geeigneteres Ergebnis.
 
 
 ```python
@@ -2293,7 +2920,7 @@ brant_basis
 
 
 
-Der Omnibus-Test (alle Prädiktoren gemeinsam) ist signifikant (p = 0.0016), was bedeutet, dass die Proportional-Odds-Annahme insgesamt verletzt ist. Bei den Einzeltests ist `age_c` allein signifikant (p = 0.0096, Annahme verletzt), `age_c_sq` allein dagegen nicht (p = 0.14, Annahme für sich genommen erfüllt). Da das Basismodell jedoch nur diese zwei Prädiktoren enthält, entspricht der Age-Block-Test exakt dem Omnibus-Test und bestätigt damit ebenfalls eine Verletzung der Annahme im Gesamtmodell.
+Der Omnibus Test über alle Prädiktoren ist statistisch signifikant (p = 0,0016) und weist damit auf eine Verletzung der Proportional Odds Annahme im Basismodell hin. Bei den Einzeltests ist `age_c` signifikant (p = 0,0096), während für `age_c_sq` kein statistisch signifikanter Hinweis auf eine Verletzung der Annahme vorliegt (p = 0,14). Der Einzeltest von `age_c` ist aufgrund seiner Abhängigkeit von der gewählten Zentrierung jedoch nur eingeschränkt isoliert zu interpretieren. Da das Basismodell ausschliesslich `age_c` und `age_c_sq` als Prädiktoren enthält, entspricht der gemeinsame Age Block Test dem Omnibus Test. Dieser bestätigt mit p = 0,0016, dass die Proportional Odds Annahme für den Alterseffekt insgesamt im Basismodell verletzt ist.
 
 
 ```python
@@ -2439,9 +3066,10 @@ brant_haupt
 
 
 
-Auch hier: Omnibus ist signifikant und der Age-Block Test zeigt ebenfalls eine klare Verletzung (p = 0.0019), sehr nah am Basismodell Ergebnis (p = 0.0016). Das bestätigt die erwartete Stabilität dieses Tests unabhängig von den Kontrollvariablen.
+Auch im Hauptmodell ist der Omnibus Test statistisch signifikant und weist damit auf eine Verletzung der Proportional Odds Annahme hin. Der gemeinsame Age Block Test zeigt ebenfalls eine deutliche Verletzung der Annahme (p = 0,0019) und liegt damit sehr nahe am Ergebnis des Basismodells (p = 0,0016). Die nahezu identischen Ergebnisse sprechen dafür, dass der Befund für den Alterseffekt gegenüber der zusätzlichen Berücksichtigung der Kontrollvariablen `Division Name` und `Department Name` weitgehend stabil bleibt.
 
-**Kontrolle der Invarianz:** Für das Basismodell enthält der Omnibus-Test ohnehin nur `Age_c`/`Age_c_sq`. Der neue Block-Test sollte dort exakt mit der Omnibus-Zeile übereinstimmen. Für das Hauptmodell liefert der Block-Test die robuste, parametrisierungs-unabhängige Aussage zum Alterseffekt (im Gegensatz zur einzelnen `Age_c`-Zeile weiter oben, die sich beim Wechsel roh ↔ zentriert verändert).
+**Kontrolle der Invarianz:** Im Basismodell umfasst der Omnibus Test ausschliesslich `Age_c` und `Age_c_sq`. Der gemeinsame Age Block Test sollte daher bis auf mögliche numerische Rundungsabweichungen mit dem Omnibus Test übereinstimmen. Im Hauptmodell liefert der Age Block Test die gegenüber der Zentrierung beziehungsweise Parametrisierung invariante Aussage zum Alterseffekt insgesamt. Dies unterscheidet ihn vom separaten Test der einzelnen `Age_c` Zeile, dessen Ergebnis sich beim Wechsel zwischen unzentrierter und zentrierter Altersspezifikation verändern kann.
+
 
 
 ```python
@@ -2510,15 +3138,13 @@ pd.concat([omnibus_basis, age_block_basis, age_block_haupt], ignore_index=True)
 
 
 
-Diese Tabelle bestätigt das: Basismodell Omnibus (21.37) = Basismodell Age-Block (21.37), exakt identisch, wie vorhergesagt.
-
-Sowohl im Basis- als auch im Hauptmodell ist die Proportional-Odds-Annahme für den Alterseffekt verletzt (Age-Block-Test: p = 0.0016 bzw. p = 0.0019), während die Modellgüte insgesamt konsistent bleibt. Das bedeutet, der Einfluss von Alter und Age² ist nicht für alle Rating-Übergänge gleich stark ausgeprägt, ein Umstand, der als methodische Limitation von H2 in Kapitel 4/5/6 benannt wird. Die geschätzten Koeffizienten selbst bleiben davon unberührt interpretierbar, die Signifikanztests für die einzelnen Schwellen sollten jedoch mit entsprechender Vorsicht gelesen werden.
+Die Tabelle bestätigt die erwartete Invarianz: Im Basismodell stimmt die Omnibus Statistik (21,37) exakt mit der Statistik des Age Block Tests (21,37) überein. Sowohl im Basis als auch im Hauptmodell ist die Proportional Odds Annahme für den Alterseffekt verletzt. Der Age Block Test ist in beiden Modellen statistisch signifikant (Basismodell: p = 0,0016; Hauptmodell: p = 0,0019). Dies deutet darauf hin, dass der Zusammenhang von `Age_c` und `Age_c_sq` mit dem Rating nicht über alle Rating Schwellen hinweg konstant ausgeprägt ist. Dieser Befund stellt eine methodische Limitation der H2 Analyse dar und wird entsprechend in den Kapiteln 4, 5 und 6 berücksichtigt. Die Koeffizienten des Proportional Odds Modells können weiterhin als unter der Modellrestriktion geschätzte durchschnittliche Zusammenhänge interpretiert werden. Aufgrund der nachgewiesenen Verletzung der Proportional Odds Annahme ist ihre Interpretation als über alle Rating Schwellen hinweg konstante Effekte jedoch mit entsprechender Vorsicht vorzunehmen.
 
 ## Likelihood-Ratio-Test als Cross-Check (MNLogit vs. OrderedModel)
 
 `LR = 2·(llf_voll - llf_reduziert)`, `df = (K-2)·p`, `p`-Wert über die Chi²-Verteilung.
 
-Das ist ein zweiter, unabhängiger Test derselben Fragestellung wie der Brant-Test, jedoch mit einem anderen methodischen Ansatz: Statt einzelne binäre Logit Modelle zu vergleichen, wird hier die Modellanpassung (Log Likelihood) des restriktiven OrderedModel mit einem unrestringierten MNLogit (multinomiale Regression, die für jede Kategorie unabhängige Koeffizienten schätzt) verglichen. 
+Dies stellt eine zweite, methodisch unabhängige Prüfung derselben Modellannahme wie beim Brant Test dar, verwendet jedoch einen anderen Ansatz. Während beim Brant Test separate binäre Logit Modelle über die verschiedenen Schwellen hinweg verglichen werden, wird hier die Modellanpassung anhand der Log Likelihood des restringierten `OrderedModel` mit jener eines weniger restriktiven `MNLogit` Modells verglichen. Das multinomiale Logit Modell unterliegt nicht der Proportional Odds Restriktion und schätzt für die einzelnen Kategorien separate Koeffizienten.
 
 
 ```python
@@ -2593,7 +3219,7 @@ pd.concat([lr_basis, lr_haupt], ignore_index=True)
 
 
 
-Beide sind signifikant (p < 0.05), das bestätigt unabhängig vom Brant-Test dasselbe Ergebnis: Die Proportional Odds Annahme ist verletzt. 
+Beide Tests sind statistisch signifikant (p < 0,05) und liefern damit unabhängig vom Brant Test denselben Befund: Die Proportional Odds Annahme ist verletzt.
 
 ## Zusammenfassung der Testergebnisse
 
@@ -2818,9 +3444,10 @@ h2_test_results
 
 **Was bedeuten Wald- und LR-Statistik technisch?**
 
-- **Wald-Statistik** (Brant-Test): prüft, wie weit die separat geschätzten Steigungskoeffizienten der `K-1` Schwellen-Logits von *Gleichheit* entfernt sind, gemessen relativ zu ihrer gemeinsamen Stichprobenunsicherheit (Kovarianzmatrix).
-- **Likelihood-Ratio-Statistik**: vergleicht direkt die Modellanpassung (Log-Likelihood) des  restringierten `OrderedModel` mit einem unrestringierten Modell (`MNLogit`).
-- Beide Statistiken folgen unter H0 asymptotisch einer Chi²-Verteilung mit `df = (K-2)·p` Freiheitsgraden.
+-  **Wald Statistik (Brant Test):** Diese prüft, in welchem Ausmass die separat geschätzten Steigungskoeffizienten der `K − 1` Schwellen Logit Modelle voneinander abweichen. Die Abweichungen werden dabei relativ zu ihrer gemeinsamen Stichprobenunsicherheit auf Basis der Kovarianzmatrix bewertet.
+-  **Likelihood Ratio Statistik:** Diese vergleicht direkt die Modellanpassung anhand der Log Likelihood des restringierten `OrderedModel` mit jener eines weniger restriktiven     multinomialen Logit Modells (`MNLogit`).
+-  Unter der Nullhypothese folgen beide Teststatistiken asymptotisch einer Chi Quadrat Verteilung mit `df = (K − 2) · p` Freiheitsgraden.
+
 
 
 ## Ergebnistabelle & Speichern
@@ -2845,7 +3472,7 @@ for label, (res, tp) in h2_models.items():
     cond_raw = cond_row["Cond_No_roh"].iloc[0] if len(cond_row) else np.nan
     cond_c = cond_row["Cond_No_zentriert"].iloc[0] if len(cond_row) else np.nan
     for term, value in [
-        ("Wendepunkt (Age)", tp),
+        ("Geschätztes Minimum (Age)", tp),
         ("McFadden Pseudo-R2", res.prsquared),
         ("AIC", res.aic),
         ("N", res.nobs),
@@ -3017,7 +3644,7 @@ sorted(p.name for p in RESULTS_DIR.glob("h2_*"))
 
 ### 1. Vergleichbarkeit der Condition Number zwischen H1 (OLS) und H2 (OrderedModel)
 
-Die rohe Condition Number im Basismodell unterscheidet sich stark zwischen H1 und H2, obwohl beide Modelle nur `Age`/`Age²` als Prädiktoren enthalten. Der Grund liegt in der Modellierungskonvention: `smf.ols` fügt über die Formel automatisch eine Konstante (Achsenabschnitt) zur Designmatrix hinzu, während bei `OrderedModel` die frei geschätzten Schwellenwerte diese Rolle übernehmen. Die Designmatrix enthält dort nur `Age`/`Age²` selbst. Eine zusätzliche Konstanten-Spalte neben einer Variable mit einem weit von null entfernten Mittelwert (Alter von rund 43 Jahren) erhöht die Condition Number unabhängig vom Modelltyp deutlich. Das wird im Folgenden, anhand identischer Designmatrizen, nachgewiesen.
+Die Condition Number der unzentrierten Designmatrix unterscheidet sich im Basismodell deutlich zwischen H1 und H2, obwohl beide Modelle lediglich `Age` und `Age²` als Prädiktoren enthalten. Der Unterschied ist auf die jeweilige Modellierungskonvention zurückzuführen. `smf.ols` fügt bei der Verwendung einer Formel automatisch eine Konstantenspalte zur Designmatrix hinzu. Beim `OrderedModel` wird hingegen keine separate Konstante in die Prädiktormatrix aufgenommen, da die frei geschätzten Schwellenwerte die Lageparameter zwischen den ordinalen Kategorien abbilden. Die Designmatrix enthält dort somit lediglich `Age` und `Age²`. Die zusätzliche Konstantenspalte kann in Kombination mit Prädiktoren, deren Werte deutlich von null entfernt liegen, die numerische Konditionierung der Designmatrix erheblich verschlechtern und damit die Condition Number erhöhen. Dieser Zusammenhang wird im Folgenden anhand identischer Designmatrizen verdeutlicht.
 
 
 ```python
@@ -3087,13 +3714,11 @@ cond_compare
 
 
 
-**Ergebnis:** Die Werte ohne Konstante entsprechen exakt den bisher berichteten H2-Werten, die Werte mit Konstante entsprechen exakt den bisher berichteten H1-Werten, jeweils auf identischen zugrunde liegenden `Age`-Daten. Die scheinbar grosse Diskrepanz zwischen H1 und H2 ist damit vollständig durch die unterschiedliche Modellierungskonvention (Konstante vorhanden oder nicht) erklärt, nicht durch einen tatsächlichen Unterschied in der Kollinearität von `Age`/`Age²` zwischen den beiden Hypothesen. Die Zentrierung senkt die Condition Number in beiden Konventionen um denselben Faktor.  
-
-!! Ich werde noch folgendes in dem Methodikkapitel anpassen: Die Condition Numbers von H1 und H2 werden nicht direkt gegeneinander verglichen, da ihnen unterschiedliche Konventionen zugrunde liegen, sondern jeweils nur die rohe und die zentrierte Variante innerhalb desselben Modelltyps.
+**Ergebnis:** Die Werte der Designmatrix ohne Konstantenspalte entsprechen exakt den bisher für H2 berichteten Werten, während die Werte der Designmatrix mit Konstantenspalte exakt den bisher für H1 berichteten Werten entsprechen. Dabei liegen beiden Berechnungen identische `Age` Daten zugrunde. Die scheinbar grosse Diskrepanz der Condition Number zwischen H1 und H2 lässt sich somit vollständig durch die unterschiedliche Modellierungskonvention erklären, also durch das Vorhandensein beziehungsweise Fehlen einer Konstantenspalte in der Designmatrix. Sie ist nicht auf einen tatsächlichen Unterschied in der Kollinearität zwischen `Age` und `Age²` in den beiden Hypothesen zurückzuführen. Die Zentrierung reduziert die Condition Number unter beiden Modellierungskonventionen deutlich und verbessert damit die numerische Konditionierung der jeweiligen Designmatrix.
 
 ### 2. Department Jackets: schwellenspezifische Koeffizienten (Brant-Diagnostik)
 
-`Department: Jackets` ist im gepoolten `OrderedModel`-Hauptmodell nicht signifikant, verletzt laut Brant-Test jedoch die Proportional-Odds-Annahme. Das ist kein Widerspruch. Der gepoolte Koeffizient ist ein Kompromisswert über alle vier Schwellen hinweg. Liegt der wahre Effekt an den einzelnen Schwellen weit auseinander, kann der Mittelwert nahe null liegen, obwohl an einzelnen Schwellen ein deutlicher Effekt besteht. Die vier Schwellen-Logits aus der Brant-Test-Pipeline zeigen das direkt:
+`Department: Jackets` ist im gepoolten `OrderedModel` Hauptmodell nicht statistisch signifikant, weist im Brant Test jedoch auf eine Verletzung der Proportional Odds Annahme hin. Dies stellt keinen Widerspruch dar. Das `OrderedModel` schätzt unter der Proportional Odds Annahme einen gemeinsamen Koeffizienten für alle vier Schwellen. Unterscheiden sich die geschätzten Effekte zwischen den einzelnen Schwellen deutlich, kann dieser gemeinsame Koeffizient nahe null liegen und statistisch nicht signifikant sein, obwohl für einzelne Schwellen stärkere positive oder negative Zusammenhänge vorliegen. Die vier separat geschätzten Schwellen Logit Modelle aus der Brant Test Pipeline veranschaulichen diese Unterschiede direkt:
 
 
 ```python
@@ -3192,20 +3817,21 @@ RESULTS_DIR / "h2_department_jackets_thresholds.csv"
 
 
 
-**Ergebnis:** Der Effekt ist nicht konstant über die Schwellen. An den unteren Schwellen (`Rating > 1`, `Rating > 2`) zeigt sich ein signifikant negativer Effekt; an den oberen Schwellen (`Rating > 3`, `Rating > 4`) ist der Koeffizient praktisch null und nicht signifikant.
+**Ergebnis:** Der geschätzte Effekt von Department: Jackets ist nicht über alle Schwellen hinweg konstant. An den unteren Schwellen (`Rating > 1`, `Rating > 2`) zeigen sich statistisch signifikante negative Koeffizienten. An den oberen Schwellen (`Rating > 3`, `Rating > 4`)  liegen die geschätzten Koeffizienten hingegen nahe null und sind statistisch nicht signifikant.
 
-**Interpretation:** Jacken-Reviews weisen eine deutlich erhöhte Wahrscheinlichkeit auf, im untersten Bereich der Skala zu landen (1- bis 2-Sterne-Bewertungen sind bei Jacken im Vergleich zur Referenzkategorie `Bottoms` überproportional häufig), während sich Jacken in der oberen Hälfte der Skala (3 gegenüber 4 gegenüber 5 Sterne) nicht von anderen Kategorien unterscheiden. Der gepoolte `OrderedModel`-Koeffizient mittelt diesen starken Effekt am unteren Skalenende mit dem Nulleffekt am oberen Ende heraus und erscheint dadurch insgesamt nicht signifikant. Genau dieses Muster erkennt der Brant-Test und markiert es zu Recht als Verletzung der Proportional-Odds-Annahme. Für Kapitel 3.5/4 lässt sich formulieren, dass sich der Kategorieeffekt von Jacken auf besonders schlechte Bewertungen (1 bis 2 Sterne) konzentriert und in der oberen Ratinghälfte nicht nachweisbar ist, mit Verweis auf die Proportional-Odds-Verletzung als Beleg dafür, warum der gepoolte Koeffizient allein hier irreführend wäre.
+**Interpretation:** Jacken Reviews weisen im Vergleich zur Referenzkategorie `Bottoms` an den unteren Schwellen (`Rating > 1` und `Rating > 2`) eine signifikant geringere Wahrscheinlichkeit auf, die jeweilige Rating Schwelle zu überschreiten. An den oberen Schwellen (`Rating > 3` und `Rating > 4`) unterscheiden sich Jacken hingegen nicht statistisch signifikant von der Referenzkategorie. Der gepoolte `OrderedModel` Koeffizient fasst diese unterschiedlichen Effekte über alle Schwellen hinweg in einem gemeinsamen Koeffizienten zusammen und erscheint dadurch insgesamt nicht signifikant. Genau dieses Muster wird durch den Brant Test erfasst und als Verletzung der Proportional Odds Annahme ausgewiesen. Es lässt sich somit festhalten, dass sich der Kategorieeffekt von Jacken insbesondere an den unteren Rating Schwellen zeigt und an den oberen Schwellen nicht statistisch nachweisbar ist. Die Verletzung der Proportional Odds Annahme verdeutlicht dabei, weshalb der gepoolte Koeffizient allein den schwellenabhängigen Zusammenhang für `Department: Jackets` nur unzureichend abbildet.
+
 
 ## H3: Zusammenhang Sentiment und Rating
 
-H3 prüft den Zusammenhang zwischen den beiden Bewertungsmethoden, Freitext-Sentiment (`VADER Compound`) und Sternebewertung (`Rating`), ohne Alter oder andere Kontrollvariablen. Geprüft wird die Kausalrichtung Sentiment als Prädiktor für Rating: Sentiment im Freitext gilt als Ausdruck der zugrunde liegenden Kundenzufriedenheit, die das Rating hervorbringt.
+H3 prüft den Zusammenhang zwischen den beiden Bewertungsmethoden, dem Freitext Sentiment (`VADER Compound`) und der Sternebewertung (`Rating`), ohne Alter oder weitere Kontrollvariablen. Dabei wird `VADER Compound` als Prädiktor für `Rating` modelliert. Diese Richtung folgt der inhaltlichen Annahme, dass das im Freitext ausgedrückte Sentiment die zugrunde liegende Kundenzufriedenheit widerspiegelt, die sich ebenfalls in der Sternebewertung äussert. Die gewählte Modellspezifikation stellt jedoch keinen empirischen Nachweis einer kausalen Wirkungsrichtung dar.
 
-1. **Deskriptive Verteilungsanalyse**: Verteilungsform von `Rating` und `VADER Compound`
-2. **Rating ~ VADER Compound** (Ordinal Logit, inkl. Proportional-Odds-Test)
-3. **Vergleich**: Korrelationsstärke (Pearson/Spearman) und Einordnung über die Verteilungsform
+1. **Deskriptive Verteilungsanalyse**: Untersuchung der Verteilungsform von `Rating` und `VADER Compound`
+2. **Rating ~ VADER Compound**: Ordinale logistische Regression einschliesslich Prüfung der Proportional Odds Annahme
+3. **Vergleich**: Untersuchung der Stärke des Zusammenhangs mittels Pearson und Spearman Korrelation sowie Einordnung der Ergebnisse unter Berücksichtigung der Verteilungsformen
 
 
-## Deskriptive Verteilungsanalyse (stark rechtsschief)
+## Deskriptive Verteilungsanalyse (stark linksschief)
 
 
 
@@ -3249,19 +3875,19 @@ plt.show()
 
 
     
-![png](04_Regression_export_files/04_Regression_export_123_0.png)
+![png](04_Regression_export_files/04_Regression_export_134_0.png)
     
 
 
-Die Rating-Verteilung ist stark rechtsschief und streng monoton fallend: 5 Sterne dominieren mit 55.4 % aller Bewertungen, gefolgt von 4 Sternen (21.7 %), 3 Sternen (12.5 %), 2 Sternen (6.8 %) und 1 Stern als seltenster Kategorie (3.6 %). Die Häufigkeit nimmt von 5 bis 1 Stern durchgehend ab, es gibt keine zweite Häufung am unteren Ende der Skala. Auch `VADER Compound` ist rechtsschief verteilt, mit einer deutlichen Konzentration im stark positiven Bereich nahe +1 und einem längeren linken Ausläufer, ein Muster, das zur bereits in der Residualdiagnostik von H1 und H3 beobachteten Linksschiefe der Residuen passt.
+Die Verteilung von `Rating` ist deutlich auf hohe Bewertungen konzentriert und weist eine linksschiefe Form auf. 5 Sterne dominieren mit 55,4 % aller Bewertungen, gefolgt von 4 Sternen (21,7 %), 3 Sternen (12,5 %), 2 Sternen (6,8 %) und 1 Stern als seltenster Kategorie (3,6 %). Die Häufigkeit nimmt von 5 bis 1 Stern durchgehend ab, sodass keine zweite Häufung am unteren Ende der Skala erkennbar ist. Auch `VADER Compound` ist linksschief verteilt, mit einer deutlichen Konzentration im stark positiven Bereich nahe +1 und einem längeren linken Ausläufer. Dieses Verteilungsmuster ist deskriptiv mit der bereits in der Residualdiagnostik von H1 beobachteten Linksschiefe der Residuen vereinbar, ohne dass daraus ein direkter kausaler Zusammenhang abgeleitet werden kann.
 
-
-**Hinweis zur Einordnung:** Die hier beobachtete Verteilung weicht von der in Teilen der Literatur berichteten bimodalen J-Form ab, bei der neben der Häufung am oberen Ende auch eine zweite, kleinere Häufung bei sehr niedrigen Bewertungen auftritt, etwa als Folge von Selection-Bias bei Online-Bewertungen (Hu, Zhang & Pavlou, 2009). Im vorliegenden Datensatz fehlt dieser zweite Peak vollständig, die Verteilung ist durchgehend monoton fallend. Hu, Zhang & Pavlou (2009) dient hier ausschliesslich als Kontrastpunkt aus der Literatur, nicht als Erklärung für das hier beobachtete Muster.
+**Hinweis zur Einordnung:** Die hier beobachtete Rating Verteilung weicht von der in Teilen der Literatur berichteten bimodalen J Form ab, bei der neben einer Häufung am oberen Ende auch eine zweite, kleinere Häufung bei sehr niedrigen Bewertungen auftritt, etwa im Zusammenhang mit Selection Bias bei Online Bewertungen (Hu, Zhang und Pavlou, 2009). Im vorliegenden Datensatz fehlt diese zweite Häufung vollständig und die Verteilung ist durchgehend monoton fallend. Hu, Zhang und Pavlou (2009) dienen hier ausschliesslich als Kontrastpunkt aus der Literatur und nicht als Erklärung für das im vorliegenden Datensatz beobachtete Muster.
 
 
 ## Rating ~ VADER Compound (Ordinal Logit)
 
-`OrderedModel` wie bei H2, aber mit `VADER Compound` als **einzigem** Prädiktor (kein Alter, keine Kontrollvariablen), für direkte methodische Vergleichbarkeit mit H2 inkl. Proportional-Odds-Test.
+Für H3 wird analog zu H2 ein `OrderedModel` geschätzt, wobei `VADER Compound` als einziger Prädiktor verwendet wird. Alter und weitere Kontrollvariablen werden nicht in das Modell aufgenommen. Die Verwendung derselben Modellklasse und die zusätzliche Prüfung der Proportional Odds Annahme ermöglichen eine direkte methodische Vergleichbarkeit mit H2.
+
 
 
 
@@ -3279,8 +3905,8 @@ print(res_h3.summary())
     Dep. Variable:                      y   Log-Likelihood:                -25379.
     Model:                   OrderedModel   AIC:                         5.077e+04
     Method:            Maximum Likelihood   BIC:                         5.081e+04
-    Date:                Sun, 30 Aug 2026                                         
-    Time:                        12:53:21                                         
+    Date:                Tue, 15 Sep 2026                                         
+    Time:                        08:42:16                                         
     No. Observations:               22640                                         
     Df Residuals:                   22635                                         
     Df Model:                           1                                         
@@ -3307,7 +3933,8 @@ print(f"N: {int(res_h3.nobs)}")
     N: 22640
 
 
-**Proportional-Odds-Test (Brant, Wald):** Da hier nur ein einziger Prädiktor im Modell steht, sind Omnibus-Test, Einzelvariablen-Test und (parametrisierungsinvarianter) Block-Test für `VADER Compound` mathematisch identisch (alle df = K-2 = 3), anders als bei H2, wo die Zerlegung in Age_c/Age_c_sq eine Unterscheidung nötig machte. Es genügt daher ein einzelner Test, der dieselbe Brant-Pipeline wie bei H2 nutzt (methodisch konsistent).
+**Proportional Odds Test (Brant, Wald):** Da das Modell lediglich `VADER Compound` als Prädiktor enthält, sind der Omnibus Test, der Einzelvariablen Test und der Block Test für `VADER Compound` inhaltlich und rechnerisch identisch. Alle drei Tests weisen `df = K − 2 = 3` Freiheitsgrade auf. Anders als bei H2 ist daher keine separate Betrachtung mehrerer zusammengehöriger Terme erforderlich, wie sie dort aufgrund der Zerlegung des Alterseffekts in `Age_c` und `Age_c_sq` vorgenommen wurde. Für H3 genügt somit ein einzelner Test, der mit derselben Brant Test Pipeline wie bei H2 durchgeführt wird und dadurch die methodische Konsistenz zwischen den Analysen gewährleistet.
+
 
 
 ```python
@@ -3369,7 +3996,7 @@ brant_h3
 
 
 
-## Vergleich: Korrelationsstärke & Einordnung über die rechtsschiefe Rating-Verteilung
+## Vergleich: Korrelationsstärke und Einordnung über die linksschiefe Rating-Verteilung
 
 
 
@@ -3429,35 +4056,24 @@ h3_correlations
 
 
 
-**Interpretation:** Pearson- und Spearman-Korrelation liegen erwartungsgemäss nah beieinander (vgl. Zahlen oberhalb). Mit r ≈ 0.47 und ρ ≈ 0.43 zeigen beide einen positiven, moderaten bis mittelstarken Zusammenhang zwischen Sentiment-Ton und Sternebewertung, deutlich von null entfernt, aber ebenso deutlich von einer perfekten Übereinstimmung (r = 1) entfernt. Das deckt sich mit der deskriptiven Verteilungsanalyse: Die stark rechtsschiefe, streng monoton fallende Verteilung des Ratings (dominierende Häufung bei 5 Sternen, stetig abnehmende Häufigkeit bis 1 Stern) komprimiert die tatsächliche Bandbreite der Kundenerfahrung auf wenige, extrem besetzte Kategorien, während der Freitext (VADER Compound) eine feinere, kontinuierliche Abstufung erlaubt. Reviews mit inhaltlich sehr unterschiedlichem Ton können dadurch auf dieselbe Rating-Kategorie (v. a. 5 Sterne) fallen, und umgekehrt können unterschiedliche Rating-Stufen ähnlich formulierte Reviews enthalten (z. B. sachlich-neutrale 3- vs. 4-Sterne-Reviews). Sentiment und Rating messen also verwandte, aber nicht identische Aspekte der Kundenerfahrung.
+**Interpretation:** Pearson und Spearman Korrelation liegen erwartungsgemäss nahe beieinander (vgl. Zahlen oberhalb). Mit r ≈ 0,47 und ρ ≈ 0,43 zeigen beide einen positiven, moderaten Zusammenhang zwischen dem Sentiment im Freitext und der Sternebewertung. Die Koeffizienten liegen deutlich über null, zugleich aber ebenso deutlich unter einer perfekten Übereinstimmung (r = 1). Dieses Ergebnis ist mit der deskriptiven Verteilungsanalyse vereinbar: Die stark auf hohe Bewertungen konzentrierte und von 5 bis 1 Stern monoton abnehmende Verteilung von `Rating` bildet die Kundenerfahrung über lediglich fünf diskrete Kategorien ab, während `VADER Compound` eine feinere, kontinuierliche Abstufung des im Freitext ausgedrückten Sentiments ermöglicht. Reviews mit unterschiedlich ausgeprägtem Sentiment können dadurch derselben Rating Kategorie zugeordnet sein, insbesondere der stark besetzten Kategorie mit 5 Sternen. Umgekehrt können Reviews verschiedener Rating Stufen ähnliche Sentiment Werte aufweisen, beispielsweise bei sachlich formulierten 3 und 4 Sterne Reviews. `VADER Compound` und `Rating` erfassen somit deutlich verwandte, aber nicht vollständig übereinstimmende Aspekte der Kundenbewertung.
 
+## Bootstrap-Vergleich der geschätzten Minima H1 vs. H2
 
-#### Diskussionspunkt für die Conclusion
+Die geschätzten Minima der beiden U förmigen Alterskurven (H1: ≈ 47 Jahre; H2: ≈ 37 Jahre) wurden bisher lediglich anhand ihrer Punktschätzer gegenübergestellt. Im Folgenden wird mittels eines gepaarten Bootstraps geprüft, ob sich die Differenz zwischen den geschätzten Minima statistisch von null unterscheidet:
 
-**Notiz für die Conclusion der Arbeit, nicht Teil der eigentlichen Notebook-Analyse:** Warum fällt die Ratingverteilung hier rechtsschief und streng monoton fallend aus, statt wie in Teilen der Literatur (z. B. Hu, Zhang & Pavlou, 2009) bimodal bzw. J-förmig? Mögliche Erklärungsansätze, die in der Conclusion diskutiert und idealerweise mit Literatur unterlegt werden könnten:
+1. In jeder Bootstrap Iteration wird aus dem gemeinsamen Analysedatensatz mit N = 22'627 Beobachtungen ein Resample gleicher Grösse durch Ziehen der Zeilenindizes mit Zurücklegen erzeugt. Berücksichtigt werden dabei die Beobachtungen mit vorhandenen Angaben zu `Division Name` und `Department Name`. Für H1 und H2 werden dieselben gezogenen Indizes verwendet. Durch dieses gepaarte Vorgehen bleibt die Abhängigkeit zwischen den beiden Schätzungen innerhalb jedes Resamples erhalten, sodass die Differenz der geschätzten Minima unmittelbar bestimmt werden kann.
+2. Auf jedem Resample werden das H1 Hauptmodell mittels OLS ohne `Recommended IND` und das H2 Hauptmodell mittels `OrderedModel` neu geschätzt. Anschliessend wird für beide Modelle das jeweilige geschätzte Minimum berechnet.
+3. Aus den `N_BOOTSTRAP` resultierenden Differenzen zwischen dem geschätzten Minimum von H1 und dem geschätzten Minimum von H2 werden der Standardfehler, ein 95 % Perzentil Konfidenzintervall sowie ein näherungsweiser zweiseitiger bootstrapbasierter p Wert bestimmt.
+4. Da die Bootstrap Verteilung der Differenz rechtsschief ist (siehe Diagnose weiter unten), wird ergänzend ein BCa Konfidenzintervall (bias corrected and accelerated) berechnet. Dieses berücksichtigt sowohl eine mögliche Verzerrung als auch die Asymmetrie der Bootstrap Verteilung und dient damit als ergänzende Intervallschätzung.
 
-- Produktkategorie: Bekleidung mit branchenüblichem Rückgaberecht senkt möglicherweise den Anreiz, eine sehr negative Erfahrung überhaupt öffentlich als 1-Stern-Review zu dokumentieren (Rückgabe statt Review als Reaktionskanal), anders als bei den in der Originalstudie meist betrachteten Produkttypen.
-- Plattform- und Stichprobenspezifika: Kundenstruktur, Kaufkontext oder Anreizsystem der konkreten Plattform könnten sich von den in Hu, Zhang & Pavlou (2009) untersuchten Plattformen bzw. Produkttypen unterscheiden.
-- Weitere denkbare Faktoren: zeitliche Distanz zur Originalstudie, Stichprobengrösse, Vorselektion der Reviews im Datensatz.
+**Vereinfachung:** Die Alterszentrierung (`age_mean`) wird für alle Resamples auf den Mittelwert des Originaldatensatzes fixiert. Da die Zentrierung eine reine Verschiebung darstellt, beeinflusst dies die geschätzte Minimum Differenz nicht, vereinfacht jedoch die Implementierung.
 
-Diese Überlegungen sind vorläufig und nicht ausformuliert. Sie dienen als Ausgangspunkt für die spätere Diskussion in der Conclusion und sind nicht Teil der Notebook-Analyse selbst.
-
-
-## Wendepunkt-Bootstrap-Vergleich H1 vs. H2
-
-Die Wendepunkte der beiden U-förmigen Alterskurven (H1: ≈ 47 Jahre, H2: ≈ 37 Jahre) wurden bisher nur als Punktschätzer gegenübergestellt. Hier wird formal per gepaartem Bootstrap geprüft, ob sich die Differenz statistisch von null unterscheidet:
-
-1. In jeder Iteration wird ein Satz Zeilenindizes mit Zurücklegen aus dem gemeinsamen Analysedatensatz gezogen (N = 22.627, Zeilen mit vorhandener Division/Department-Angabe). Dieselben Indizes werden für H1 und H2 verwendet (gepaart, nicht unabhängig), damit die Differenz der Wendepunkte pro Resample sinnvoll interpretierbar ist.
-2. H1-Hauptmodell (OLS, ohne `Recommended IND`) und H2-Hauptmodell (OrderedModel) werden auf dem Resample neu geschätzt, der jeweilige Wendepunkt wird berechnet.
-3. Aus den `N_BOOTSTRAP` Differenzen (Wendepunkt H1 minus Wendepunkt H2) werden Standardfehler, 95%-Perzentil-Konfidenzintervall und ein näherungsweiser zweiseitiger p-Wert bestimmt.
-4. Da die Bootstrap-Verteilung der Differenz rechtsschief ist (siehe Diagnose weiter unten), wird ergänzend ein BCa-Konfidenzintervall (bias-corrected and accelerated) berechnet, das Schiefe und Verzerrung der Verteilung berücksichtigt.
-
-**Vereinfachung:** Die Alterszentrierung (`age_mean`) wird für alle Resamples auf dem Stichprobenmittelwert des Originaldatensatzes fixiert, nicht pro Resample neu berechnet. Das ist eine reine Verschiebungskonstante und beeinflusst die Wendepunkt-Differenz nicht, vereinfacht aber die Implementierung.
 
 
 
 ```python
-N_BOOTSTRAP = 300
+N_BOOTSTRAP = 1000
 BOOTSTRAP_SEED = 42
 
 boot_base = df.dropna(subset=["Division Name", "Department Name"]).reset_index(drop=True).copy()
@@ -3479,6 +4095,9 @@ rng = np.random.default_rng(BOOTSTRAP_SEED)
 
 tp_h1_boot, tp_h2_boot = [], []
 n_failed = 0
+
+import time
+_bootstrap_start = time.perf_counter()
 
 for _ in range(N_BOOTSTRAP):
     idx = rng.integers(0, n_obs, size=n_obs)
@@ -3504,11 +4123,15 @@ tp_h1_boot = np.array(tp_h1_boot)
 tp_h2_boot = np.array(tp_h2_boot)
 diff_boot = tp_h1_boot - tp_h2_boot
 
+_bootstrap_elapsed = time.perf_counter() - _bootstrap_start
+
 print(f"Erfolgreiche Resamples: {len(diff_boot)} / {N_BOOTSTRAP} (fehlgeschlagen: {n_failed})")
+print(f"Laufzeit Bootstrap-Schleife: {_bootstrap_elapsed:.1f} Sekunden ({_bootstrap_elapsed / 60:.2f} Minuten)")
 
 ```
 
-    Erfolgreiche Resamples: 300 / 300 (fehlgeschlagen: 0)
+    Erfolgreiche Resamples: 1000 / 1000 (fehlgeschlagen: 0)
+    Laufzeit Bootstrap-Schleife: 1538.6 Sekunden (25.64 Minuten)
 
 
 
@@ -3523,8 +4146,8 @@ p_two_sided = min(p_two_sided, 1.0)
 bootstrap_summary = pd.DataFrame([{
     "N_Bootstrap_erfolgreich": len(diff_boot),
     "N_Bootstrap_fehlgeschlagen": n_failed,
-    "Wendepunkt H1 (Original)": turning_point(h1_haupt.params["age_c"], h1_haupt.params["age_c_sq"]),
-    "Wendepunkt H2 (Original)": tp_haupt,
+    "Geschätztes Minimum H1 (Original)": turning_point(h1_haupt.params["age_c"], h1_haupt.params["age_c_sq"]),
+    "Geschätztes Minimum H2 (Original)": tp_haupt,
     "Differenz H1-H2 (Original)": diff_original,
     "Differenz Bootstrap-Mittelwert": diff_boot.mean(),
     "Bootstrap SE": diff_se,
@@ -3558,8 +4181,8 @@ bootstrap_summary
       <th></th>
       <th>N_Bootstrap_erfolgreich</th>
       <th>N_Bootstrap_fehlgeschlagen</th>
-      <th>Wendepunkt H1 (Original)</th>
-      <th>Wendepunkt H2 (Original)</th>
+      <th>Geschätztes Minimum H1 (Original)</th>
+      <th>Geschätztes Minimum H2 (Original)</th>
       <th>Differenz H1-H2 (Original)</th>
       <th>Differenz Bootstrap-Mittelwert</th>
       <th>Bootstrap SE</th>
@@ -3571,15 +4194,15 @@ bootstrap_summary
   <tbody>
     <tr>
       <th>0</th>
-      <td>300</td>
+      <td>1000</td>
       <td>0</td>
       <td>47.422867</td>
       <td>37.227537</td>
       <td>10.19533</td>
-      <td>10.355855</td>
-      <td>3.958427</td>
-      <td>3.820353</td>
-      <td>20.491917</td>
+      <td>10.613676</td>
+      <td>4.349112</td>
+      <td>4.611098</td>
+      <td>20.263112</td>
       <td>0.0</td>
     </tr>
   </tbody>
@@ -3590,10 +4213,11 @@ bootstrap_summary
 
 ### BCa-Konfidenzintervall (bias-corrected and accelerated)
 
-Die Bootstrap-Verteilung der Wendepunkt-Differenz ist rechtsschief (Skewness ≈ 1.14, siehe Diagnose oben), das einfache Perzentil-Konfidenzintervall setzt aber implizit eine annähernd symmetrische Verteilung voraus. Ergänzend wird daher ein BCa-Konfidenzintervall berechnet, das für Schiefe (Bias-Korrektur `z0`) und für die Abhängigkeit der Varianz vom wahren Parameterwert (Beschleunigung `a`) korrigiert.
+Die Bootstrap Verteilung der Minimum Differenz ist rechtsschief. Obwohl das Perzentil Konfidenzintervall keine symmetrische Verteilung voraussetzt, berücksichtigt es mögliche Verzerrungen und Schiefe nur eingeschränkt. Daher wird ergänzend ein BCa Konfidenzintervall berechnet.
 
-`scipy.stats.bootstrap(..., method="BCa")` ist hier nicht direkt nutzbar: Es würde intern eine vollständige Leave-one-out-Jackknife über alle N = 22.627 Beobachtungen verlangen, also 22.627 zusätzliche OLS- plus OrderedModel-Fits, was rechnerisch nicht praktikabel ist. Stattdessen wird die Standard-BCa-Formel (Efron & Tibshirani, 1993) manuell implementiert, mit einer **Gruppen-Jackknife** als recheneffizienter Näherung für den eigentlichen Leave-one-out-Schritt: Die Daten werden in `JACKKNIFE_GROUPS` zufällige, disjunkte Blöcke aufgeteilt, pro Block wird die Wendepunkt-Differenz auf dem jeweils verbleibenden Datensatz neu geschätzt. Diese Gruppen-Pseudowerte übernehmen in der Beschleunigungs-Formel dieselbe Rolle wie die klassischen Leave-one-out-Werte. Eine Sensitivitätsprüfung mit 25 und 100 statt 50 Gruppen bestätigt, dass die konkrete Wahl von `JACKKNIFE_GROUPS = 50` unkritisch ist, die Beschleunigung `a` bleibt in allen drei Fällen nahe null und die BCa-CI-Grenzen verschieben sich nur geringfügig (untere Grenze 4.42 bis 4.57, obere Grenze 21.26 bis 22.33 Jahre).
+`scipy.stats.bootstrap(..., method="BCa")` ist hier nicht direkt praktikabel, da dafür ein vollständiger Leave one out Jackknife mit N = 22'627 zusätzlichen OLS und `OrderedModel` Schätzungen erforderlich wäre. Daher wird die Standard BCa Formel nach Efron und Tibshirani (1993) manuell mit einem Gruppen Jackknife als recheneffizienter Näherung implementiert. Die Daten werden in `JACKKNIFE_GROUPS` zufällige, disjunkte Gruppen aufgeteilt und die Minimum Differenz jeweils unter Ausschluss einer Gruppe neu geschätzt.
 
+**Hinweis zur methodischen Einordnung:** Die verwendete Formel für den Beschleunigungsparameter \(a\) ist die klassische Leave-one-out-Formel nach Efron und Tibshirani (1993), wird hier jedoch auf Gruppen-Jackknife-Werte statt auf Einzelbeobachtungswerte angewendet. Diese Übertragung dient als rechnerische Approximation. Ihre Eignung für das vorliegende Verfahren wurde nicht gesondert validiert. Das daraus berechnete BCa-Konfidenzintervall wird deshalb lediglich zu Dokumentationszwecken ausgewiesen und nicht zur zusätzlichen Absicherung des Befunds herangezogen.
 
 
 ```python
@@ -3659,9 +4283,9 @@ ci_comparison
 
 ```
 
-    z0 = 0.1172, a = -0.0103
-    BCa-Perzentile: 3.91% / 98.43% (statt 2.5% / 97.5% beim Perzentil-CI)
-    BCa-CI: [4.42, 21.26] Jahre
+    z0 = 0.0778, a = -0.0103
+    BCa-Perzentile: 3.28% / 98.09% (statt 2.5% / 97.5% beim Perzentil-CI)
+    BCa-CI: [5.00, 21.22] Jahre
 
 
 
@@ -3694,14 +4318,14 @@ ci_comparison
     <tr>
       <th>0</th>
       <td>Perzentil (2.5% / 97.5%)</td>
-      <td>3.820353</td>
-      <td>20.491917</td>
+      <td>4.611098</td>
+      <td>20.263112</td>
     </tr>
     <tr>
       <th>1</th>
-      <td>BCa (z0=0.117, a=-0.010)</td>
-      <td>4.419024</td>
-      <td>21.262606</td>
+      <td>BCa (z0=0.078, a=-0.010)</td>
+      <td>5.000039</td>
+      <td>21.217216</td>
     </tr>
   </tbody>
 </table>
@@ -3719,9 +4343,9 @@ ax.axvline(diff_ci_low, color="#55A868", linewidth=1.2, linestyle=":", label=f"P
 ax.axvline(diff_ci_high, color="#55A868", linewidth=1.2, linestyle=":")
 ax.axvline(bca_ci_low, color="#DD8452", linewidth=1.2, linestyle="-.", label=f"BCa-CI [{bca_ci_low:.1f}, {bca_ci_high:.1f}]")
 ax.axvline(bca_ci_high, color="#DD8452", linewidth=1.2, linestyle="-.")
-ax.set_xlabel("Wendepunkt-Differenz H1 vs. H2 (Jahre)")
+ax.set_xlabel("Geschätzte Minimum-Differenz H1 vs. H2 (Jahre)")
 ax.set_ylabel("Häufigkeit (Bootstrap-Resamples)")
-ax.set_title("Bootstrap-Verteilung der Wendepunkt-Differenz H1 vs. H2")
+ax.set_title("Bootstrap-Verteilung der geschätzten Minimum-Differenz H1 vs. H2")
 ax.legend(fontsize=8)
 fig.tight_layout()
 fig.savefig(FIGURES_DIR / "h1_h2_turning_point_bootstrap.png", dpi=150)
@@ -3731,13 +4355,13 @@ plt.show()
 
 
     
-![png](04_Regression_export_files/04_Regression_export_140_0.png)
+![png](04_Regression_export_files/04_Regression_export_149_0.png)
     
 
 
-**Interpretation:** Trotz des im bereinigten Hauptmodell nicht mehr signifikanten linearen Alterseffekts auf Sentiment (H1) unterscheidet sich der rechnerische Wendepunkt der (schwachen) Krümmung von H1 (circa 47 Jahre) statistisch signifikant vom Wendepunkt der Alterskurve bei H2 (circa 37 Jahre, BCa-Konfidenzintervall [4.42, 21.26] Jahre für die Differenz). Diese Aussage ist mit Vorsicht zu interpretieren: Da der lineare Term bei H1 selbst nicht signifikant ist, beschreibt der Wendepunkt keine belastbare U-Form, sondern den Scheitelpunkt einer sehr flachen, kaum ausgeprägten Krümmung. Der Vergleich zeigt daher weniger einen inhaltlich bedeutsamen Unterschied zwischen zwei U-Kurven, sondern bestätigt eher, dass sich Sentiment und Rating auch in ihrer schwachen Altersabhängigkeit strukturell unterscheiden.
+**Interpretation:** Das geschätzte Minimum der Alterskurve von H1 liegt bei rund 47 Jahren, jenes von H2 bei rund 37 Jahren. Die geschätzte Differenz beträgt damit rund 10,2 Jahre. Das 95%-Perzentil-Konfidenzintervall für diese Differenz reicht von rund 4,6 bis 20,3 Jahren und schliesst null nicht ein. Dies liefert statistische Evidenz dafür, dass sich die Positionen der geschätzten Minima unterscheiden. Daraus lässt sich jedoch weder ableiten, wie stark die jeweiligen Alterszusammenhänge ausgeprägt sind, noch, dass beide Alterskurven gleich deutlich U-förmig verlaufen. Der Vergleich betrifft ausschliesslich die Lage der geschätzten Minima. Das ergänzend berechnete BCa-Konfidenzintervall wird aufgrund der nicht gesondert validierten gruppierten Jackknife-Approximation lediglich zu Dokumentationszwecken ausgewiesen und nicht zur zusätzlichen Absicherung des Befunds herangezogen.
 
-**Limitation:** Der Wendepunkt ist als Quotient aus linearem und quadratischem Alterskoeffizienten definiert. Da der quadratische Term in beiden Modellen, besonders in H1 nach Entfernung von Recommended IND, klein und mit Unsicherheit geschätzt ist, reagiert der Wendepunkt empfindlich auf kleine Schwankungen dieses Nenners (verwandt mit dem Fieller-Problem bei Quotienten aus geschätzten Grössen). Das zeigt sich in einer rechtsschiefen Bootstrap-Verteilung der Wendepunkt-Differenz mit vereinzelten Ausreissern. Ergänzend zum Perzentil-Konfidenzintervall wird daher ein BCa-Konfidenzintervall berichtet, das Schiefe und Verzerrung der Bootstrap-Verteilung berücksichtigt.
+**Limitation:** Das geschätzte Minimum ist als Quotient aus linearem und quadratischem Alterskoeffizienten definiert. Da insbesondere der quadratische Term in H1 klein ist und mit Schätzunsicherheit behaftet ist, kann das geschätzte Minimum empfindlich auf Schwankungen des Nenners reagieren. Dies ist mit dem Fieller Problem bei Quotienten aus geschätzten Grössen verwandt und zeigt sich in der rechtsschiefen Bootstrap Verteilung der Minimum Differenz mit vereinzelten Ausreissern. Ergänzend zum Perzentil Konfidenzintervall wird daher ein BCa Konfidenzintervall berichtet, das Verzerrung und Asymmetrie der Bootstrap Verteilung berücksichtigt.
 
 
 
@@ -3753,17 +4377,18 @@ RESULTS_DIR / "h1_h2_turning_point_bootstrap.csv"
 
 
 
----
+
 
 # Robustheitscheck: Alterseffekt nach Produktkategorie
 
-Ziel dieses Abschnitts ist zu prüfen, ob der Alterseffekt auf Sentiment (H1) und auf Rating (H2) über die Produktkategorien `Division Name`, `Department Name` und `Class Name` hinweg konsistent ist, oder ob er nur in bestimmten Kategorien auftritt. Geprüft wird isoliert je Kategorie-Auspraegung, ohne Interaktionsterme im Gesamtmodell.
 
-**Vorgehen:** Fuer jede Kategorisierung wird getrennt je Auspraegung das jeweilige Basismodell geschaetzt (H1: `VADER Compound ~ Age_c + Age_c_sq`, OLS; H2: `Rating ~ Age_c + Age_c_sq`, OrderedModel), ohne weitere Kontrollvariablen, um Verzerrung durch andere Kategorievariablen zu vermeiden. Die zentrierte Altersvariable `Age_c` (und `Age_c_sq`) wird dabei unveraendert aus dem Gesamtdatensatz uebernommen (gleicher `age_mean` wie im Rest des Notebooks), damit die Wendepunkte ueber alle Kategorien und mit den bisherigen Gesamtmodellen vergleichbar bleiben.
+Ziel dieses Abschnitts ist es zu prüfen, ob der Alterseffekt auf Sentiment (H1) und Rating (H2) über die Produktkategorien `Division Name`, `Department Name` und `Class Name` hinweg konsistent ist oder sich nur in bestimmten Kategorien zeigt. Die Analyse erfolgt separat für jede Kategorieausprägung und ohne Interaktionsterme im Gesamtmodell.
 
-**Mindestfallzahl:** Ausprägungen mit weniger als N = 500 Beobachtungen werden zu einer Sammelkategorie `Sonstige` zusammengefasst. Erreicht auch `Sonstige` die Mindestfallzahl, wird ebenfalls ein Modell geschätzt, andernfalls wird nur deskriptiv berichtet (Mittelwert `VADER Compound`, N, kein Modellfit).
+**Mindestfallzahl:** Ausprägungen mit weniger als N = 500 Beobachtungen werden zur Sammelkategorie `Sonstige` zusammengefasst. Erreicht auch `Sonstige` die Mindestfallzahl, wird ebenfalls ein Modell geschätzt. Andernfalls erfolgt lediglich eine deskriptive Auswertung mit Mittelwert von `VADER Compound` und N, ohne Modellschätzung.
 
-**Limitation vorab:** Wie im Bootstrap-Abschnitt oben gezeigt, ist der Wendepunkt ein Quotient aus linearem und quadratischem Alterskoeffizienten und reagiert empfindlich auf einen kleinen oder unsicher geschätzten Nenner (`age_c_sq`). Bei kleineren Kategorie-Stichproben verschärft sich dieses Problem zusätzlich. Wendepunkte ausserhalb des tatsächlichen Altersbereichs der Stichprobe (18 bis 99 Jahre) werden daher als nicht plausibel gekennzeichnet und in den Abbildungen nicht dargestellt, bleiben aber in den CSV-Exports zur Transparenz erhalten.
+**Vorgehen:** Für jede Kategorisierung wird getrennt nach Ausprägung das jeweilige Basismodell geschätzt (H1: `VADER Compound ~ Age_c + Age_c_sq`, OLS; H2: `Rating ~ Age_c + Age_c_sq`, `OrderedModel`). Weitere Kontrollvariablen werden nicht aufgenommen, um den Alterseffekt innerhalb der jeweiligen Kategorieausprägung einheitlich und isoliert zu untersuchen. Die zentrierten Altersvariablen `Age_c` und `Age_c_sq` werden unverändert aus dem Gesamtdatensatz übernommen, mit demselben `age_mean` wie im restlichen Notebook. Dadurch bleiben die geschätzten Minima zwischen den Kategorien und mit den bisherigen Gesamtmodellen vergleichbar.
+
+ **Limitation vorab:** Wie im Bootstrap Abschnitt oben gezeigt, ist das geschätzte Minimum ein Quotient aus linearem und quadratischem Alterskoeffizienten und reagiert empfindlich auf einen kleinen oder unsicher geschätzten Nenner (`age_c_sq`). Bei kleineren Kategorie Stichproben kann sich dieses Problem zusätzlich verstärken. Geschätzte Minima ausserhalb des beobachteten Altersbereichs von 18 bis 99 Jahren werden daher als nicht plausibel gekennzeichnet und in den Abbildungen nicht dargestellt, bleiben jedoch zur Transparenz in den CSV Exporten enthalten.
 
 
 
@@ -3774,7 +4399,7 @@ MIN_N_CATEGORY = 500
 tp_h1_basis_ref = turning_point(h1_basis.params["age_c"], h1_basis.params["age_c_sq"])
 tp_h2_basis_ref = tp_basis
 
-print(f"Referenz-Wendepunkte (Gesamtmodell, Basismodell): H1 = {tp_h1_basis_ref:.2f} Jahre, H2 = {tp_h2_basis_ref:.2f} Jahre")
+print(f"Referenz-Minima (Basismodell, Gesamtdatensatz): H1 = {tp_h1_basis_ref:.2f} Jahre, H2 = {tp_h2_basis_ref:.2f} Jahre")
 print(f"Beobachteter Altersbereich: {AGE_MIN:.0f} bis {AGE_MAX:.0f} Jahre")
 
 
@@ -3802,24 +4427,24 @@ def fit_h1_h2_by_category(source_df, category_col, min_n=MIN_N_CATEGORY):
         if n >= min_n:
             res1 = smf.ols("vader_compound ~ age_c + age_c_sq", data=group).fit()
             tp1 = turning_point(res1.params["age_c"], res1.params["age_c_sq"])
-            row["Wendepunkt H1"] = tp1
+            row["Geschätztes Minimum H1"] = tp1
             row["p (age_c, H1)"] = res1.pvalues["age_c"]
             row["Signifikanz age_c H1"] = "ja" if res1.pvalues["age_c"] < 0.05 else "nein"
             row["p (age_c_sq, H1)"] = res1.pvalues["age_c_sq"]
             row["Signifikanz age_c_sq H1"] = "ja" if res1.pvalues["age_c_sq"] < 0.05 else "nein"
-            row["Wendepunkt H1 im Altersbereich"] = "ja" if AGE_MIN <= tp1 <= AGE_MAX else "nein"
+            row["Geschätztes Minimum H1 im Altersbereich"] = "ja" if AGE_MIN <= tp1 <= AGE_MAX else "nein"
 
             try:
                 X2 = group[["age_c", "age_c_sq"]].astype(float).rename(columns={"age_c": "Age_c", "age_c_sq": "Age_c_sq"})
                 y2 = pd.Categorical(group["rating"], categories=RATING_CATEGORIES, ordered=True)
                 res2 = OrderedModel(y2, X2, distr="logit").fit(method="bfgs", disp=False, maxiter=200)
                 tp2 = turning_point(res2.params["Age_c"], res2.params["Age_c_sq"])
-                row["Wendepunkt H2"] = tp2
+                row["Geschätztes Minimum H2"] = tp2
                 row["p (age_c, H2)"] = res2.pvalues["Age_c"]
                 row["Signifikanz age_c H2"] = "ja" if res2.pvalues["Age_c"] < 0.05 else "nein"
                 row["p (age_c_sq, H2)"] = res2.pvalues["Age_c_sq"]
                 row["Signifikanz age_c_sq H2"] = "ja" if res2.pvalues["Age_c_sq"] < 0.05 else "nein"
-                row["Wendepunkt H2 im Altersbereich"] = "ja" if AGE_MIN <= tp2 <= AGE_MAX else "nein"
+                row["Geschätztes Minimum H2 im Altersbereich"] = "ja" if AGE_MIN <= tp2 <= AGE_MAX else "nein"
                 row["H2 konvergiert"] = res2.mle_retvals.get("converged")
             except Exception as e:
                 row["H2 Fehler"] = str(e)
@@ -3831,12 +4456,12 @@ def fit_h1_h2_by_category(source_df, category_col, min_n=MIN_N_CATEGORY):
 
 
 def plot_category_turning_points(result_df, title, save_path, tp_h1_ref, tp_h2_ref):
-    """Forest-Plot-ähnliche Darstellung: Wendepunkt je Kategorie fuer H1 (Kreis) und H2
+    """Forest-Plot-ähnliche Darstellung: Geschätztes Minimum je Kategorie fuer H1 (Kreis) und H2
     (Quadrat). Gefüllte Marker = age_c signifikant, offene Marker = age_c nicht signifikant.
-    Wendepunkte ausserhalb des beobachteten Altersbereichs werden nicht geplottet, sondern
+    Geschätzte Minima ausserhalb des beobachteten Altersbereichs werden nicht geplottet, sondern
     als Text vermerkt und als Liste zurueckgegeben."""
-    h2_col = result_df["Wendepunkt H2"] if "Wendepunkt H2" in result_df else pd.Series(dtype=float)
-    plot_df = result_df[result_df["Wendepunkt H1"].notna() | h2_col.notna()].copy()
+    h2_col = result_df["Geschätztes Minimum H2"] if "Geschätztes Minimum H2" in result_df else pd.Series(dtype=float)
+    plot_df = result_df[result_df["Geschätztes Minimum H1"].notna() | h2_col.notna()].copy()
     plot_df = plot_df.sort_values("N")
 
     fig, ax = plt.subplots(figsize=(7.5, max(2.5, 0.55 * len(plot_df) + 1.2)))
@@ -3844,8 +4469,8 @@ def plot_category_turning_points(result_df, title, save_path, tp_h1_ref, tp_h2_r
 
     excluded = []
     for i, (_, row) in enumerate(plot_df.iterrows()):
-        tp1 = row.get("Wendepunkt H1")
-        tp2 = row.get("Wendepunkt H2")
+        tp1 = row.get("Geschätztes Minimum H1")
+        tp2 = row.get("Geschätztes Minimum H2")
         h1_sig = row.get("Signifikanz age_c H1") == "ja"
         h2_sig = row.get("Signifikanz age_c H2") == "ja"
 
@@ -3864,14 +4489,14 @@ def plot_category_turning_points(result_df, title, save_path, tp_h1_ref, tp_h2_r
             excluded.append(f"{row['Kategorie']} (H2: {tp2:.1f} Jahre)")
 
     ax.axvline(tp_h1_ref, color="#4C72B0", linestyle=":", linewidth=1.2, alpha=0.7,
-               label=f"H1 Gesamtmodell ({tp_h1_ref:.1f} Jahre)")
+               label=f"H1 Basismodell (Gesamtdatensatz) ({tp_h1_ref:.1f} Jahre)")
     ax.axvline(tp_h2_ref, color="#DD8452", linestyle=":", linewidth=1.2, alpha=0.7,
-               label=f"H2 Gesamtmodell ({tp_h2_ref:.1f} Jahre)")
+               label=f"H2 Basismodell (Gesamtdatensatz) ({tp_h2_ref:.1f} Jahre)")
 
     ax.set_yticks(range(len(plot_df)))
     ax.set_yticklabels([f"{row['Kategorie']} (N={row['N']})" for _, row in plot_df.iterrows()])
     ax.set_xlim(AGE_MIN - 5, AGE_MAX + 5)
-    ax.set_xlabel("Wendepunkt (Jahre)")
+    ax.set_xlabel("Geschätztes Minimum (Jahre)")
     ax.set_title(title)
 
     marker_handles = [
@@ -3894,7 +4519,7 @@ def plot_category_turning_points(result_df, title, save_path, tp_h1_ref, tp_h2_r
 
 ```
 
-    Referenz-Wendepunkte (Gesamtmodell, Basismodell): H1 = 47.33 Jahre, H2 = 37.39 Jahre
+    Referenz-Minima (Basismodell, Gesamtdatensatz): H1 = 47.33 Jahre, H2 = 37.39 Jahre
     Beobachteter Altersbereich: 18 bis 99 Jahre
 
 
@@ -3933,18 +4558,18 @@ result_division
       <th>Kategorie</th>
       <th>N</th>
       <th>VADER Compound (Mittelwert)</th>
-      <th>Wendepunkt H1</th>
+      <th>Geschätztes Minimum H1</th>
       <th>p (age_c, H1)</th>
       <th>Signifikanz age_c H1</th>
       <th>p (age_c_sq, H1)</th>
       <th>Signifikanz age_c_sq H1</th>
-      <th>Wendepunkt H1 im Altersbereich</th>
-      <th>Wendepunkt H2</th>
+      <th>Geschätztes Minimum H1 im Altersbereich</th>
+      <th>Geschätztes Minimum H2</th>
       <th>p (age_c, H2)</th>
       <th>Signifikanz age_c H2</th>
       <th>p (age_c_sq, H2)</th>
       <th>Signifikanz age_c_sq H2</th>
-      <th>Wendepunkt H2 im Altersbereich</th>
+      <th>Geschätztes Minimum H2 im Altersbereich</th>
       <th>H2 konvergiert</th>
     </tr>
   </thead>
@@ -4016,7 +4641,7 @@ result_division
 ```python
 excluded_division = plot_category_turning_points(
     result_division,
-    "Wendepunkte nach Division Name (H1 vs. H2)",
+    "Geschätztes Minimum nach Division Name (H1 vs. H2)",
     FIGURES_DIR / "h1_h2_kategorien_division.png",
     tp_h1_basis_ref, tp_h2_basis_ref,
 )
@@ -4025,7 +4650,7 @@ excluded_division = plot_category_turning_points(
 
 
     
-![png](04_Regression_export_files/04_Regression_export_147_0.png)
+![png](04_Regression_export_files/04_Regression_export_157_0.png)
     
 
 
@@ -4064,18 +4689,18 @@ result_department
       <th>Kategorie</th>
       <th>N</th>
       <th>VADER Compound (Mittelwert)</th>
-      <th>Wendepunkt H1</th>
+      <th>Geschätztes Minimum H1</th>
       <th>p (age_c, H1)</th>
       <th>Signifikanz age_c H1</th>
       <th>p (age_c_sq, H1)</th>
       <th>Signifikanz age_c_sq H1</th>
-      <th>Wendepunkt H1 im Altersbereich</th>
-      <th>Wendepunkt H2</th>
+      <th>Geschätztes Minimum H1 im Altersbereich</th>
+      <th>Geschätztes Minimum H2</th>
       <th>p (age_c, H2)</th>
       <th>Signifikanz age_c H2</th>
       <th>p (age_c_sq, H2)</th>
       <th>Signifikanz age_c_sq H2</th>
-      <th>Wendepunkt H2 im Altersbereich</th>
+      <th>Geschätztes Minimum H2 im Altersbereich</th>
       <th>H2 konvergiert</th>
       <th>Hinweis</th>
     </tr>
@@ -4211,7 +4836,7 @@ result_department
 ```python
 excluded_department = plot_category_turning_points(
     result_department,
-    "Wendepunkte nach Department Name (H1 vs. H2)",
+    "Geschätztes Minimum nach Department Name (H1 vs. H2)",
     FIGURES_DIR / "h1_h2_kategorien_department.png",
     tp_h1_basis_ref, tp_h2_basis_ref,
 )
@@ -4220,7 +4845,7 @@ excluded_department = plot_category_turning_points(
 
 
     
-![png](04_Regression_export_files/04_Regression_export_150_0.png)
+![png](04_Regression_export_files/04_Regression_export_160_0.png)
     
 
 
@@ -4259,18 +4884,18 @@ result_class
       <th>Kategorie</th>
       <th>N</th>
       <th>VADER Compound (Mittelwert)</th>
-      <th>Wendepunkt H1</th>
+      <th>Geschätztes Minimum H1</th>
       <th>p (age_c, H1)</th>
       <th>Signifikanz age_c H1</th>
       <th>p (age_c_sq, H1)</th>
       <th>Signifikanz age_c_sq H1</th>
-      <th>Wendepunkt H1 im Altersbereich</th>
-      <th>Wendepunkt H2</th>
+      <th>Geschätztes Minimum H1 im Altersbereich</th>
+      <th>Geschätztes Minimum H2</th>
       <th>p (age_c, H2)</th>
       <th>Signifikanz age_c H2</th>
       <th>p (age_c_sq, H2)</th>
       <th>Signifikanz age_c_sq H2</th>
-      <th>Wendepunkt H2 im Altersbereich</th>
+      <th>Geschätztes Minimum H2 im Altersbereich</th>
       <th>H2 konvergiert</th>
     </tr>
   </thead>
@@ -4494,7 +5119,7 @@ result_class
 ```python
 excluded_class = plot_category_turning_points(
     result_class,
-    "Wendepunkte nach Class Name (H1 vs. H2)",
+    "Geschätztes Minimum nach Class Name (H1 vs. H2)",
     FIGURES_DIR / "h1_h2_kategorien_class.png",
     tp_h1_basis_ref, tp_h2_basis_ref,
 )
@@ -4503,7 +5128,7 @@ excluded_class = plot_category_turning_points(
 
 
     
-![png](04_Regression_export_files/04_Regression_export_153_0.png)
+![png](04_Regression_export_files/04_Regression_export_163_0.png)
     
 
 
@@ -4512,13 +5137,13 @@ excluded_class = plot_category_turning_points(
 
 ### Zusammenfassende Interpretation
 
-**Division Name (3 von 3 Kategorien geschätzt):** `General` und `General Petite` zeigen für H1 und H2 ähnliche, plausible Wendepunkte (H1: 43 bis 50 Jahre, H2: 33 bis 38 Jahre), nahe an den Basismodell-Referenzwerten des Gesamtmodells (H1: 47.3 Jahre, H2: 37.4 Jahre). `Initmates` (die kleinste Division, N = 1.426) weicht mit höheren Wendepunkten ab (H1: 68.7 Jahre, H2: 44.3 Jahre), dort sind aber weder `age_c` noch `age_c_sq` in einem der beiden Modelle signifikant. Die Abweichung ist damit nicht von Stichprobenrauschen zu unterscheiden, nicht als inhaltlicher Unterschied zu werten.
+**Division Name (3 von 3 Kategorien geschätzt):** `General` und `General Petite` zeigen für H1 und H2 ähnliche und plausible geschätzte Minima (H1: 43 bis 50 Jahre; H2: 33 bis 38 Jahre), die nahe an den Referenzwerten des Basismodells für den Gesamtdatensatz liegen (H1: 47,3 Jahre; H2: 37,4 Jahre). `Initmates` als kleinste Division (N = 1'426) weicht mit höheren geschätzten Minima ab (H1: 68,7 Jahre; H2: 44,3 Jahre). Allerdings sind dort weder `age_c` noch `age_c_sq` in einem der beiden Modelle statistisch signifikant. Die Abweichung ist daher statistisch nicht abgesichert und sollte nicht als belastbarer inhaltlicher Unterschied interpretiert werden.
 
-**Department Name (5 von 6 Kategorien geschaetzt, `Trend` mit N = 118 nur deskriptiv):** `Trend` fällt bereits deskriptiv auf (Mittelwert `VADER Compound` = 0.63, alle anderen Departments liegen bei 0.73 bis 0.75), konnte aber wegen zu geringer Fallzahl nicht eigens geschätzt werden. Unter den geschätzten Departments ist nur `Tops` (das grösste, N = 10.048) bei H1 im quadratischen Term signifikant und bei H2 im linearen Term signifikant. Bei allen anderen Departments (`Dresses`, `Bottoms`, `Intimate`, `Jackets`) ist keiner der beiden Alterskoeffizienten signifikant, die berichteten Wendepunkte (40 bis 69 Jahre bei H1, 20 bis 44 Jahre bei H2) sind entsprechend nicht belastbar interpretierbar.
+**Department Name (5 von 6 Kategorien geschätzt, `Trend` mit N = 118 nur deskriptiv):** `Trend` fällt bereits deskriptiv auf. Der Mittelwert von `VADER Compound` beträgt 0,63, während die übrigen Departments Werte zwischen 0,73 und 0,75 aufweisen. Aufgrund der geringen Fallzahl konnte für `Trend` jedoch kein separates Modell geschätzt werden. Unter den geschätzten Departments ist bei H1 lediglich für `Tops`, das mit N = 10'048 die grösste Kategorie darstellt, der quadratische Altersterm statistisch signifikant. Bei H2 ist der lineare Altersterm ebenfalls nur für `Tops` signifikant; zusätzlich zeigt sich für `Dresses` (N = 6'145, zweitgrösstes Department) ein signifikanter quadratischer Altersterm (p = 0,039), wenn auch nur knapp unterhalb des Signifikanzniveaus. Bei den übrigen, kleineren Departments (`Bottoms`, `Intimate`, `Jackets`) ist hingegen keiner der beiden Alterskoeffizienten statistisch signifikant. Die dort geschätzten Minima von 51 bis 69 Jahren bei H1 beziehungsweise 20 bis 44 Jahren bei H2 sind daher nur eingeschränkt interpretierbar
 
-**Class Name (11 von 11 Kategorien geschaetzt, inklusive der zusammengefassten Sammelkategorie `Sonstige` mit N = 1.726):** Die meisten Klassen liegen in einem grob plausiblen Bereich, aber zwei Faelle bestätigen konkret die eingangs genannte Limitation: Bei `Blouses` ist `age_c_sq` in H1 praktisch null und statistisch nicht von null unterscheidbar (p = 0.999), der daraus berechnete Wendepunkt (rund 2.108 Jahre) ist eine numerische Artefaktzahl ohne inhaltliche Bedeutung. Bei `Jeans` führt ein ähnlich unsicher geschaetztes `age_c_sq` in H2 zu einem negativen, ebenfalls unplausiblen Wendepunkt (rund minus 30 Jahre). Beide Werte wurden automatisch als ausserhalb des beobachteten Altersbereichs erkannt und in der Abbildung nicht dargestellt, bleiben aber in der CSV zur Transparenz erhalten. Auch `Blouses` bei H2 (rund 112 Jahre, ausserhalb des Altersbereichs) faellt in dieselbe Kategorie, trotz eines nominell signifikanten `age_c` ist dort `age_c_sq` nicht signifikant (p = 0.712), sodass die eigentliche Krümmung nicht gesichert ist.
+**Class Name (11 von 11 Kategorien geschätzt, einschliesslich der Sammelkategorie `Sonstige` mit N = 1'726):** Die meisten Klassen weisen geschätzte Minima in einem plausiblen Bereich auf. Zwei Fälle verdeutlichen jedoch die eingangs beschriebene Limitation besonders deutlich. Bei `Blouses` liegt `age_c_sq` in H1 praktisch bei null und ist statistisch nicht signifikant (p = 0,999). Das daraus berechnete geschätzte Minimum von rund 2'108 Jahren ist daher ein numerisches Artefakt ohne inhaltliche Bedeutung. Bei `Jeans` führt ein ebenfalls unsicher geschätztes `age_c_sq` in H2 zu einem negativen und damit unplausiblen geschätzten Minimum von rund minus 30 Jahren. Beide Werte wurden automatisch als ausserhalb des beobachteten Altersbereichs erkannt und in der Abbildung nicht dargestellt, bleiben jedoch zur Transparenz im CSV Export enthalten. Auch `Blouses` bei H2 fällt mit einem geschätzten Minimum von rund 112 Jahren in diese Kategorie. Obwohl `age_c` dort nominell signifikant ist, ist `age_c_sq` nicht signifikant (p = 0,712), sodass keine statistisch abgesicherte Krümmung vorliegt.
 
-**Gesamtfazit:** Der Alterseffekt ist ueber die Produktkategorien hinweg nicht durchgaengig nachweisbar. In den meisten einzelnen Kategorien reicht die Fallzahl nicht aus, um `age_c` oder `age_c_sq` signifikant von null zu unterscheiden, was angesichts des ohnehin schwachen Alterseffekts im Gesamtmodell (siehe H1-Hauptmodell ohne `Recommended IND`) plausibel ist. Wo Kategorien dennoch deutlich abweichende Wendepunkte zeigen, sind diese entweder statistisch nicht abgesichert (`Initmates`, die meisten Departments) oder eindeutig als Rechenartefakt eines nahe null geschätzten `age_c_sq` zu erkennen (`Blouses`, `Jeans`), genau die Fieller-Problematik, die bereits im Bootstrap-Abschnitt als Limitation benannt wurde, hier jedoch bei kleineren Kategorie-Stichproben noch deutlicher sichtbar. Die grundsaetzliche Richtung (Wendepunkt bei H1 tendenziell hoeher als bei H2) zeigt sich zwar auch auf Kategorieebene wieder, sollte aber angesichts der ueberwiegend fehlenden statistischen Absicherung nicht als robuster, kategorieuebergreifender Befund ueberinterpretiert werden.
+**Gesamtfazit:** Der Alterseffekt ist über die Produktkategorien hinweg nicht durchgängig statistisch nachweisbar. In den meisten einzelnen Kategorien können weder `age_c` noch `age_c_sq` statistisch signifikant von null unterschieden werden. Dies ist mit dem insgesamt schwach ausgeprägten Alterseffekt, insbesondere im H1 Hauptmodell ohne `Recommended IND`, vereinbar. Deutlich abweichende geschätzte Minima sind entweder statistisch nicht abgesichert, wie bei `Initmates` und den meisten Departments, oder entstehen durch einen nahe null und unsicher geschätzten quadratischen Altersterm, wie bei `Blouses` und `Jeans`. Diese Fälle verdeutlichen die bereits im Bootstrap Abschnitt diskutierte Problematik bei der Schätzung des Minimums als Quotient zweier geschätzter Koeffizienten. Die grundsätzliche Tendenz eines höheren geschätzten Minimums bei H1 als bei H2 zeigt sich auch auf Kategorieebene, sollte aufgrund der überwiegend fehlenden statistischen Absicherung jedoch nicht als stabiler kategorieübergreifender Befund interpretiert werden.
 
 
 ## Ergebnistabelle & Speichern

@@ -1,10 +1,10 @@
-# 06: Amazon-Reviews-2023 (Electronics) als Stichprobe für externe Robustheitsprüfung
+# 06: Amazon Reviews 2023 (Electronics) als Stichprobe zur externen Robustheitsprüfung
 
-Ziel: Eine externe Stichprobe aus einer anderen Produktkategorie/Plattform-Domäne (Amazon Electronics, statt Women's Clothing E-Commerce) ziehen, um die Kernbefunde aus `04_Regression.ipynb` (v.a. H3: Zusammenhang zwischen Sentiment und Rating) ausserhalb des ursprünglichen Datensatzes zu prüfen.
+**Ziel:** Anhand einer unabhängigen Stichprobe aus einer anderen Produktkategorie und Plattformdomäne (Amazon Electronics statt Women's Clothing E Commerce) wird geprüft, ob sich die zentralen Befunde aus `04_Regression.ipynb`, insbesondere der in H3 untersuchte Zusammenhang zwischen Sentiment und Rating, ausserhalb des ursprünglichen Datensatzes in vergleichbarer Form zeigen.
 
-Datensatz: [`McAuley-Lab/Amazon-Reviews-2023`](https://huggingface.co/datasets/McAuley-Lab/Amazon-Reviews-2023) (43,9 Mio. Reviews über alle Kategorien). Da eine einzelne Kategorie wie *Electronics* immer noch mehrere Millionen Reviews umfasst, wird **nicht** heruntergeladen, sondern per **Streaming** (`streaming=True`) direkt eine Stichprobe von 25.000 Reviews gezogen.
+**Datensatz:** [`McAuley-Lab/Amazon-Reviews-2023`](https://huggingface.co/datasets/McAuley-Lab/Amazon-Reviews-2023) mit insgesamt rund 43,9 Millionen Reviews über verschiedene Produktkategorien. Da bereits die einzelne Kategorie **Electronics** mehrere Millionen Reviews umfasst, wird nicht der vollständige Datensatz heruntergeladen. Stattdessen wird mittels Streaming (`streaming=True`) direkt eine Stichprobe von 25'000 Reviews gezogen.
 
-**Hinweis zum Laden:** Der offizielle Loader des Datensatz-Repos nutzt ein Python-Ladeskript (`Amazon-Reviews-2023.py`). Aktuelle Versionen der `datasets`-Bibliothek (≥ 4.0) führen solche Skripte aus Sicherheitsgründen nicht mehr automatisch aus (`RuntimeError: Dataset scripts are no longer supported`). Der Datensatz stellt dieselben Rohdaten aber auch direkt als JSON-Lines-Datei pro Kategorie bereit (`raw/review_categories/Electronics.jsonl`); diese wird hier direkt und ohne Skript als generisches `"json"`-Dataset geladen, inhaltlich identisch zur Reviews-Konfiguration (nicht die Metadaten-Variante `raw_meta_Electronics`).
+**Hinweis zum Laden:** Der offizielle Loader des Datensatz Repositories verwendet ein Python Ladeskript (`Amazon-Reviews-2023.py`). Aktuelle Versionen der `datasets` Bibliothek ab Version 4.0 unterstützen solche Dataset Skripte nicht mehr und führen beim entsprechenden Ladeversuch zu einem `RuntimeError`. Die Rohdaten werden jedoch zusätzlich direkt als JSON Lines Datei für jede Produktkategorie bereitgestellt. Für die vorliegende Analyse wird daher `raw/review_categories/Electronics.jsonl` unmittelbar als generisches `"json"` Dataset geladen. Diese Datei enthält die für die Analyse benötigten Reviewdaten der Kategorie Electronics und ist von der separaten Metadatenvariante `raw_meta_Electronics` zu unterscheiden.
 
 
 ```python
@@ -28,10 +28,9 @@ SAMPLE_SIZE = 25_000
 BUFFER_SIZE = 200_000  # Begründung siehe Markdown unten
 ```
 
-## Streaming-Datensatz laden & Stichprobe ziehen
+## Streaming-Datensatz laden und Stichprobe ziehen
 
-**Zur Puffergrösse:** Eine Stichprobenprüfung der ersten 20.000 Zeilen zeigte, dass die Rohdatei nach `user_id` gruppiert ist (aufeinanderfolgende Reviews derselben Person, teils 500+ Reviews am Stück). Ein zu kleiner Shuffle-Puffer würde die Stichprobe daher auf wenige „Vielschreiber:innen" verzerren. `BUFFER_SIZE = 200.000` mischt über deutlich mehr Nutzer:innen hinweg (Benchmark: rund
-9.000 Zeilen/Sekunde Lesegeschwindigkeit, d.h. Puffer + Stichprobe zusammen ca. 25–30 Sekunden) und bleibt trotzdem weit unter der Gesamtgrösse der Kategorie.
+**Zur Puffergrösse:** Eine Stichprobenprüfung der ersten 20'000 Zeilen zeigte, dass die Rohdatei nach `user_id` gruppiert ist und aufeinanderfolgende Reviews derselben Person enthält, teilweise mehr als 500 Reviews am Stück. Bei einem zu kleinen Shuffle Puffer könnte die gezogene Stichprobe daher überproportional von wenigen Personen mit besonders vielen Reviews geprägt sein. Mit `BUFFER_SIZE = 200_000` erfolgt die Durchmischung über einen deutlich grösseren Bereich und damit über wesentlich mehr Personen hinweg. Bei einer gemessenen Lesegeschwindigkeit von rund 9'000 Zeilen pro Sekunde dauert das Einlesen von Puffer und Stichprobe zusammen etwa 25 bis 30 Sekunden. Gleichzeitig bleibt die gewählte Puffergrösse deutlich unter der Gesamtzahl der Reviews in der Kategorie Electronics.
 
 
 ```python
@@ -191,21 +190,21 @@ amazon_df.head()
 
 ## Wie funktioniert der Streaming-Ansatz, und warum ist er hier sinnvoller als der volle Download?
 
-**Funktionsweise:** `streaming=True` liefert kein vollständig heruntergeladenes/materialisiertes Dataset-Objekt, sondern einen **Iterator**, der die Datei zeilenweise über HTTP vom Hugging-Face-Hub liest (`hf://…`): JSON-Zeile für JSON-Zeile, ohne die Datei vorher lokal zu speichern. `.shuffle(seed=42, buffer_size=200_000)` füllt zunächst einen Puffer mit den ersten 200.000 gelesenen Zeilen; danach wird bei jeder weiteren Abfrage ein zufälliger Eintrag aus dem Puffer ausgegeben und durch die nächste ungelesene Zeile ersetzt (reservoir-artiges „Sliding-Window" Shuffling); dadurch bleibt der Speicherbedarf konstant bei `BUFFER_SIZE` Zeilen, unabhängig davon, wie gross die Gesamtdatei ist. `.take(25_000)` bricht das Lesen ab, sobald 25.000 Elemente ausgegeben wurden; insgesamt werden also nur `BUFFER_SIZE + SAMPLE_SIZE` ≈ 225.000 Zeilen aus der Quelle gelesen, nicht die vollständige Datei mit vermutlich zweistelliger Millionenzahl an Zeilen.
+**Funktionsweise:** Mit `streaming=True` wird der Datensatz nicht vollständig heruntergeladen und materialisiert, sondern als iterierbarer Datensatz verarbeitet. Die Daten werden bei Bedarf fortlaufend von der Quelle gelesen, ohne dass zuvor die vollständige Datei lokal gespeichert werden muss. Mit `.shuffle(seed=42, buffer_size=200_000)` wird ein Shuffle Puffer mit bis zu 200'000 Elementen verwendet. Aus diesem Puffer werden Elemente in zufälliger Reihenfolge ausgegeben und während der Iteration durch nachfolgende Elemente aus dem Datenstrom ersetzt. Dadurch wird eine approximative Durchmischung erreicht, ohne den gesamten Datensatz gleichzeitig im Arbeitsspeicher halten zu müssen. Der dafür benötigte Speicher hängt somit primär von der gewählten `BUFFER_SIZE` und nicht von der Gesamtgrösse des Datensatzes ab. Mit `.take(25_000)` wird die Iteration auf 25'000 ausgegebene Reviews begrenzt. Unter dieser Vorgehensweise muss daher nur ein Teil der gesamten Electronics Datei verarbeitet werden, der grössenordnungsmässig durch den Shuffle Puffer und die anschliessend entnommenen Elemente bestimmt wird, anstatt die vollständige Datei einzulesen.
 
-**Warum das hier sinnvoller ist als der volle Download:**
+**Warum dieses Vorgehen hier sinnvoller ist als ein vollständiger Download:**
 
-- **Ressourcen:** Die vollständige `Electronics.jsonl` umfasst mehrere Gigabyte (inkl. Bild-URLs, Metadaten je Review); für eine 25.000er-Stichprobe wäre ein kompletter Download reine Verschwendung von Bandbreite, Speicherplatz und Wartezeit. Der gemessene Durchsatz (~9.000 Zeilen/Sek.) macht die Stichprobe in < 30 Sekunden fertig, statt für den Volldownload ggf. mehrere Minuten bis Stunden zu warten.
-- **Reproduzierbarkeit:** Der feste `seed=42` sorgt dafür, dass bei jedem erneuten Ausführen exakt dieselben 25.000 Zeilen gezogen werden (solange sich die Quelldatei nicht ändert), ohne dass die Datei dafür persistent lokal vorliegen muss.
-- **Praktikabilität für eine Robustheitsprüfung:** Für eine externe Validierung reicht eine hinreichend grosse, hinreichend zufällige Stichprobe; die vollständige Kategorie wird für diesen Zweck nicht benötigt.
-
-**Wichtige Einschränkung (methodische Transparenz):** Der Shuffle-Puffer sorgt nur für lokale Durchmischung der zuerst gelesenen `BUFFER_SIZE + SAMPLE_SIZE` Zeilen; er liest **nicht** die gesamte Datei und zieht daher **keine** strikt uniforme Zufallsstichprobe über die komplette Kategorie hinweg (Zeilen weit hinten in der Datei haben keine Chance, gezogen zu werden). Da die Rohdatei zudem nach `user_id` gruppiert ist, wurde `BUFFER_SIZE` bewusst gross gewählt (200.000 statt z. B. 10.000), um die Verzerrung durch einzelne Vielschreiber:innen zu reduzieren. Für die Thesis empfiehlt sich die Formulierung „eine Stichprobe aus dem Anfangsbereich des Streams nach Sliding-Window-Shuffling" statt „eine uniforme Zufallsstichprobe aus der Gesamtkategorie"".
+* **Ressourcen:** Die vollständige `Electronics.jsonl` umfasst mehrere Gigabyte. Für eine Stichprobe von 25'000 Reviews wäre ein vollständiger Download mit einem unnötig hohen Bedarf an Bandbreite, Speicherplatz und Rechenzeit verbunden. Bei einem gemessenen Durchsatz von rund 9'000 Zeilen pro Sekunde kann die benötigte Stichprobe mit dem gewählten Streaming Verfahren in weniger als 30 Sekunden erzeugt werden.
+* **Reproduzierbarkeit:** Der feste `seed=42` ermöglicht bei unveränderter Datenquelle und identischer Verarbeitung eine reproduzierbare Durchmischung und Stichprobenziehung, ohne dass die vollständige Quelldatei dauerhaft lokal gespeichert werden muss.
+* **Praktikabilität für die Robustheitsprüfung:** Für die Untersuchung der Übertragbarkeit der Ergebnisse ist eine ausreichend grosse und angemessen durchmischte Stichprobe ausreichend. Eine Verarbeitung der vollständigen Electronics Kategorie ist für diesen Zweck nicht erforderlich.
+**Wichtige methodische Einschränkung:** Der verwendete Shuffle Puffer erzeugt keine uniforme Zufallsstichprobe aus der gesamten Electronics Kategorie. Da die Iteration nach 25'000 ausgegebenen Reviews beendet wird, können nur Reviews berücksichtigt werden, die bis zu diesem Zeitpunkt aus dem Stream in den Shuffle Prozess gelangt sind. Weiter hinten in der Quelldatei liegende Reviews haben somit keine Auswahlwahrscheinlichkeit. Da die Rohdatei zudem nach `user_id` gruppiert ist, wurde mit `BUFFER_SIZE = 200_000` bewusst ein grosser Shuffle Puffer gewählt, um eine breitere Durchmischung über verschiedene Personen zu erreichen und eine übermässige Konzentration auf einzelne Personen mit besonders vielen Reviews zu reduzieren. Die resultierende Stichprobe ist daher methodisch als **Stichprobe aus dem Anfangsbereich des Datenstroms nach gepuffertem Shuffling** und nicht als uniforme Zufallsstichprobe aus der gesamten Electronics Kategorie zu verstehen.
 
 ---
 
 # Robustheitsprüfung: Vergleich mit H3 (Sentiment ~ Rating)
 
-Prüft, ob sich der in `04_Regression.ipynb` (H3) gefundene Zusammenhang zwischen VADER-Sentiment und Sternebewertung ausserhalb des Women's-Clothing-Datensatzes reproduzieren lässt: auf einer Stichprobe aus einer völlig anderen Produktkategorie (Electronics statt Bekleidung).
+Dieser Abschnitt prüft, ob sich der in `04_Regression.ipynb` für H3 festgestellte Zusammenhang zwischen `VADER Compound` und Sternebewertung ausserhalb des ursprünglichen Women's Clothing Datensatzes in vergleichbarer Form zeigt. Hierzu wird eine unabhängige Stichprobe aus der Produktkategorie Electronics herangezogen und damit eine andere Produktkategorie und Plattformdomäne untersucht.
+
 
 
 ```python
@@ -265,7 +264,7 @@ amazon_df["rating"] = amazon_df["rating"].astype(int)
 
 ## VADER-Sentimentanalyse
 
-**Konsistenzcheck mit `03_VADER.ipynb`:** Im Hauptdatensatz wird VADER **ausschliesslich auf `Review Text`** angewendet; `Title` wird dort nicht einbezogen (u. a. weil `Title` bei knapp 13 % der Reviews fehlt und nicht analyserelevant ist, siehe `02_Data_Cleaning.ipynb`). Für die Amazon-Stichprobe wird daher ebenfalls **nur `text`** verwendet (nicht `title + text`), damit die Sentiment-Scores methodisch vergleichbar bleiben.
+**Konsistenzcheck mit `03_VADER.ipynb`:** Im Hauptdatensatz wird VADER ausschliesslich auf `Review Text` angewendet. `Title` wird nicht in die Sentiment Analysis einbezogen, unter anderem da diese Variable bei knapp 13 Prozent der Reviews fehlt und für die Analyse nicht erforderlich ist, wie in `02_Data_Cleaning.ipynb` beschrieben. Entsprechend wird VADER auch in der Amazon Stichprobe ausschliesslich auf `text` angewendet und nicht auf eine Kombination aus `title` und `text`. Dadurch bleibt die Berechnung der Sentiment Scores zwischen Hauptdatensatz und externer Stichprobe methodisch konsistent und besser vergleichbar.
 
 
 ```python
@@ -373,7 +372,7 @@ plt.show()
 
 
     
-![png](06_Amazon_Robustness_export_files/06_Amazon_Robustness_export_22_0.png)
+![png](05_Amazon_Robustness_export_files/05_Amazon_Robustness_export_22_0.png)
     
 
 
@@ -1321,42 +1320,32 @@ robustness_results
 
 
 
-## Einschätzung: Stützt der Amazon-Befund H3?
+## Einschätzung: Stützt der Amazon Befund H3?
 
-**Kurz: Ja, die Kernaussage von H3 wird gestützt, mit einer interessanten Nuance bei der Proportional-Odds-Verletzung.**
+**Kurz: Ja. Die Kernaussage von H3 wird durch die Amazon Stichprobe grundsätzlich gestützt, wobei sich Unterschiede insbesondere bei der Spearman Korrelation und der Verletzung der Proportional Odds Annahme zeigen.**
 
-| Kennzahl | Hauptdatensatz (H3) | Amazon Electronics | Befund |
-|---|---|---|---|
-| Pearson r | 0,473 | 0,492 | fast identisch |
-| Spearman ρ | 0,432 | 0,355 | etwas schwächer bei Amazon |
-| OrderedModel Koeff. Compound | 2,401 | 1,960 | gleiche Richtung, etwas kleiner |
-| OrderedModel Pseudo-R² | 0,083 | 0,091 | vergleichbar |
-| Brant Omnibus X² | 123,41 | 634,36 | beide verletzt, Amazon deutlich stärker |
+| Kennzahl                                    | Hauptdatensatz (H3) | Amazon Electronics | Befund                                                                                      |
+| ------------------------------------------- | ------------------: | -----------------: | ------------------------------------------------------------------------------------------- |
+| Pearson r                                   |               0,473 |              0,492 | sehr ähnlich                                                                                |
+| Spearman ρ                                  |               0,432 |              0,355 | bei Amazon schwächer                                                                        |
+| `OrderedModel` Koeffizient `VADER Compound` |               2,401 |              1,960 | gleiche positive Richtung, bei Amazon kleiner                                               |
+| McFadden Pseudo R²                          |               0,083 |              0,091 | sehr ähnlich                                                                                |
+| Brant Omnibus χ²                            |              123,41 |             634,36 | in beiden Stichproben signifikante Verletzung, bei Amazon wesentlich grössere Teststatistik |
 
-**Repliziert:** Ein moderater, hochsignifikanter, positiver Zusammenhang zwischen Sentiment und Rating in praktisch identischer Grössenordnung (Korrelationen, Pseudo-R², Vorzeichen und Grössenordnung der Koeffizienten), trotz komplett anderer Produktkategorie (Electronics statt Bekleidung) und anderer Plattform-Kohorte. Das ist ein starkes Argument für die externe Validität des H3-Befunds.
+**Replikation:** In beiden Stichproben zeigt sich ein statistisch signifikanter positiver Zusammenhang zwischen Sentiment und Rating. Insbesondere die Pearson Korrelation und das McFadden Pseudo R² weisen eine sehr ähnliche Grössenordnung auf. Die Spearman Korrelation fällt in der Amazon Stichprobe dagegen etwas schwächer aus. Auch der Koeffizient von `VADER Compound` im `OrderedModel` ist positiv, jedoch kleiner als im Hauptdatensatz. Insgesamt stützen diese Ergebnisse die Übertragbarkeit der zentralen Aussage von H3 auf die untersuchte Amazon Electronics Stichprobe und liefern damit zusätzliche Evidenz für die externe Validität des Befunds.
 
-**Auffällig anders:** Die J-Shape-Verteilung ist bei Amazon deutlich ausgeprägter (5★-Anteil 65,7 % vs. 55,4 %; 1★-Anteil 8,2 % vs. 3,6 %, Extremkategorien zusammen 73,9 % vs. 59,0 %), und die Proportional-Odds-Verletzung ist bei Amazon rund 5x stärker (X² = 634 vs. 123). Das passt inhaltlich zusammen: Eine noch extremere Rating-Verteilung bedeutet, dass die mittleren Schwellen (2 vs. 3, 3 vs. 4) auf sehr wenigen Beobachtungen beruhen, wodurch der Sentiment-Effekt zwischen den Schwellen stärker variieren kann. Die Spearman-Korrelation ist bei Amazon etwas schwächer als Pearson, ebenfalls plausibel bei einer noch extremer besetzten, weniger fein abgestuften Rating-Skala, die die Rangbildung erschwert.
+**Auffällige Unterschiede:** Die J Shape Verteilung des Ratings ist in der Amazon Stichprobe stärker ausgeprägt. Der Anteil der 5 Sterne Bewertungen beträgt 65,7 Prozent gegenüber 55,4 Prozent im Hauptdatensatz, während 1 Sterne Bewertungen 8,2 Prozent gegenüber 3,6 Prozent ausmachen. Damit entfallen bei Amazon 73,9 Prozent der Beobachtungen auf die beiden Extremkategorien, verglichen mit 59,0 Prozent im Hauptdatensatz. Gleichzeitig fällt die Brant Omnibus Teststatistik mit χ² = 634,36 wesentlich höher aus als im Hauptdatensatz mit χ² = 123,41. In beiden Stichproben wird die Proportional Odds Annahme bei p < 0,001 verworfen. Die unterschiedliche Rating Verteilung könnte dazu beitragen, dass der Zusammenhang zwischen Sentiment und Rating in der Amazon Stichprobe stärker zwischen den einzelnen Rating Schwellen variiert. Aus dem vorliegenden Vergleich lässt sich jedoch nicht ableiten, dass die stärkere J Shape Verteilung die stärkere Verletzung der Proportional Odds Annahme verursacht.
 
-**Einschränkung:** Die Amazon-Stichprobe ist, wie oben dokumentiert, eine Sliding-Window-Shuffle-Stichprobe aus dem Anfangsbereich des Streams, keine strikt uniforme Stichprobe über die gesamte Electronics-Kategorie. Die beobachtete, noch stärkere J-Shape- bzw. Proportional-Odds-Verletzung könnte daher theoretisch teilweise stichprobenbedingt sein. Die frühere Prüfung ergab jedoch keine Hinweise auf eine rating- oder sentiment-korrelierte Sortierung der Rohdatei (nur eine Gruppierung nach `user_id`), sodass eine systematische Verzerrung in Richtung „extremere Bewertungen" unwahrscheinlich, aber nicht mit Sicherheit auszuschließen ist.
+Auch die niedrigere Spearman Korrelation könnte mit Unterschieden in der Rating Verteilung zusammenhängen. Da `Rating` lediglich fünf geordnete Ausprägungen besitzt und in der Amazon Stichprobe besonders stark auf die Extremkategorien konzentriert ist, treten zahlreiche Rangbindungen auf. Die genaue Differenz zwischen Pearson und Spearman sollte daher nicht als eigenständiger inhaltlicher Effekt interpretiert werden.
 
-**Formulierungsvorschlag für das Robustheitskapitel:**
+**Einschränkung:** Die Amazon Stichprobe wurde mittels gepuffertem Shuffling aus dem Anfangsbereich des Datenstroms gezogen und stellt somit keine uniforme Zufallsstichprobe aus der gesamten Electronics Kategorie dar. Die Unterschiede in der Rating Verteilung und in den Modellergebnissen könnten daher teilweise von der Stichprobenzusammensetzung beeinflusst sein. Die vorgängige Prüfung ergab eine Gruppierung der Rohdatei nach `user_id`, jedoch keine Hinweise auf eine Sortierung nach Rating oder Sentiment. Eine systematische Verzerrung hinsichtlich dieser Merkmale wurde damit nicht festgestellt, kann aufgrund der nicht uniformen Stichprobenziehung jedoch nicht vollständig ausgeschlossen werden.
 
-> "Zur Prüfung der externen Validität von H3 wurde der Sentiment-Rating-Zusammenhang zusätzlich
-> an einer Stichprobe von 24.992 Amazon-Electronics-Reviews (Streaming-Stichprobe aus
-> McAuley-Lab/Amazon-Reviews-2023, Sliding-Window-Shuffle, seed=42, s. Kap. [X]) repliziert. Der
-> Zusammenhang bestätigte sich in vergleichbarer Stärke und Richtung (Pearson r = 0,49 vs. 0,47;
-> OrderedModel Pseudo-R² = 0,091 vs. 0,083), was für die Generalisierbarkeit des in H3
-> gefundenen Effekts über Produktkategorie und Plattform-Kontext hinweg spricht. Gleichzeitig
-> zeigte die Amazon-Stichprobe eine noch ausgeprägtere J-Shape-Verteilung des Ratings und eine
-> deutlich stärkere Verletzung der Proportional-Odds-Annahme (X²(3) = 634,4 vs. 123,4, jeweils
-> p < .001), was darauf hindeutet, dass das Ausmaß der Nicht-Linearität des
-> Sentiment-Rating-Zusammenhangs mit der Schiefe der zugrunde liegenden Rating-Verteilung
-> zusammenhängen könnte, ein Aspekt, der über die vorliegende Arbeit hinaus vertieft werden
-> könnte. Einschränkend ist zu beachten, dass die Amazon-Stichprobe aus Effizienzgründen per
-> Sliding-Window-Shuffle statt eines vollständigen Datensatzdurchlaufs gezogen wurde (s. Kap.
-> [X]) und daher keine strikt uniforme Stichprobe über die gesamte Produktkategorie darstellt."
+### Formulierung für das Robustheitskapitel
 
-Damit lässt sich das Kapitel klar unterstützend (nicht nur „ergänzend" oder „einschränkend")
-formulieren, mit einem transparent benannten Caveat zur Stichprobenziehung, aber ohne dass dieser
-Caveat den Kernbefund infrage stellt.
+Zur Untersuchung der Übertragbarkeit von H3 wurde der Zusammenhang zwischen Sentiment und Rating zusätzlich anhand einer Stichprobe von 24'992 Amazon Electronics Reviews aus dem Datensatz `McAuley-Lab/Amazon-Reviews-2023` analysiert. Der positive Zusammenhang zeigt sich auch in dieser unabhängigen Stichprobe in vergleichbarer Grössenordnung. Die Pearson Korrelation beträgt 0,492 gegenüber 0,473 im Hauptdatensatz, während das McFadden Pseudo R² des `OrderedModel` mit 0,091 gegenüber 0,083 ebenfalls sehr ähnlich ausfällt. Die Spearman Korrelation ist mit 0,355 gegenüber 0,432 etwas schwächer. Insgesamt liefern die Ergebnisse zusätzliche Evidenz für die Übertragbarkeit des in H3 beobachteten positiven Zusammenhangs zwischen Freitext Sentiment und Sternebewertung auf die untersuchte Produktkategorie und Plattform.
+
+Gleichzeitig weist die Amazon Stichprobe eine stärker ausgeprägte J Shape Verteilung des Ratings sowie eine wesentlich höhere Brant Omnibus Teststatistik auf. Die Proportional Odds Annahme wird in beiden Stichproben verworfen, wobei die Teststatistik in der Amazon Stichprobe χ²(3) = 634,4 gegenüber χ²(3) = 123,4 im Hauptdatensatz beträgt, jeweils bei p < 0,001. Die unterschiedliche Verteilungsstruktur könnte mit einer stärkeren Variation des Sentiment Zusammenhangs zwischen den einzelnen Rating Schwellen verbunden sein. Dieser mögliche Zusammenhang kann mit der vorliegenden Analyse jedoch nicht kausal beurteilt werden.
+
+Einschränkend ist zu berücksichtigen, dass die Amazon Stichprobe aus Effizienzgründen mittels gepuffertem Shuffling aus dem Anfangsbereich des Datenstroms gezogen wurde und daher keine uniforme Zufallsstichprobe aus der gesamten Electronics Kategorie darstellt. Dieser Aspekt begrenzt die Generalisierbarkeit der Robustheitsprüfung, stellt den in der untersuchten Stichprobe erneut beobachteten positiven Zusammenhang zwischen Sentiment und Rating jedoch nicht grundsätzlich infrage.
+
 
