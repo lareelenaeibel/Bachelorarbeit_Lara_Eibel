@@ -3,8 +3,8 @@
 Dep. Variable:         vader_compound   R-squared:                       0.001
 Model:                            OLS   Adj. R-squared:                  0.001
 Method:                 Least Squares   F-statistic:                     2.887
-Date:                Wed, 09 Sep 2026   Prob (F-statistic):            0.00206
-Time:                        13:09:02   Log-Likelihood:                -9400.4
+Date:                Fri, 25 Sep 2026   Prob (F-statistic):            0.00206
+Time:                        13:00:00   Log-Likelihood:                -9400.4
 No. Observations:               22627   AIC:                         1.882e+04
 Df Residuals:                   22617   BIC:                         1.890e+04
 Df Model:                           9                                         
